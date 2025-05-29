@@ -15,8 +15,7 @@ const VideoPlayer: React.FC = () => {
     addLog,
     setIsPlaying,
     setCurrentTime,
-    setDuration,
-    updateAdRequest
+    setDuration
   } = useStore();
 
   useEffect(() => {

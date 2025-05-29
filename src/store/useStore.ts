@@ -47,7 +47,7 @@ const defaultCTVConfig: CTVConfig = {
   vastTag: '',
   openRtbEndpoint: '',
   prebidServerConfig: {
-    endpoint: 'http://localhost:8081/openrtb2/auction',
+    endpoint: 'https://ctv-simulator.vercel.app/api/openrtb2/auction',
     accountId: 'ctv-simulator-account',
     timeout: 1000,
     demandSources: PREBID_DEMAND_SOURCES
@@ -56,7 +56,7 @@ const defaultCTVConfig: CTVConfig = {
   tcfString: 'CPXxRfAPXxRfAAfKABENB-CgAAAAAAAAAAYgAAAAAAAA',
 };
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>((set) => ({
   // CTV Configuration
   ctvConfig: defaultCTVConfig,
   setCtvConfig: (config) =>

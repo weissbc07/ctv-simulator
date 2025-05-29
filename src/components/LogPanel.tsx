@@ -1,14 +1,12 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { 
-  Filter, 
   Trash2, 
   Clock, 
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
   Info,
-  Eye,
   Copy
 } from 'lucide-react';
 import { useStore } from '../store/useStore';

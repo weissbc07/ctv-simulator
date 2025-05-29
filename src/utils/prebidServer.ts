@@ -427,6 +427,11 @@ export const makePrebidServerRequest = async (
 
 export const PREBID_SERVER_ENDPOINTS = [
   {
+    name: 'Vercel API (Production)',
+    url: 'https://ctv-simulator.vercel.app/api/openrtb2/auction',
+    description: 'Vercel deployed API endpoint for production testing'
+  },
+  {
     name: 'Local Test Server',
     url: 'http://localhost:8081/openrtb2/auction',
     description: 'Local test server for development and testing'

@@ -1,9 +1,8 @@
-import React from 'react';
 import VideoPlayer from './components/VideoPlayer';
 import ConfigPanel from './components/ConfigPanel';
 import LogPanel from './components/LogPanel';
 import { useStore } from './store/useStore';
-import { Tv, Settings, Activity } from 'lucide-react';
+import { Tv, Activity } from 'lucide-react';
 
 function App() {
   const { isPlaying, currentTime, duration } = useStore();
