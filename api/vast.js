@@ -1,6 +1,3 @@
-import { createServer } from 'http';
-import { parse } from 'url';
-
 // VAST XML template for testing
 const VAST_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <VAST version="4.0">
@@ -63,40 +60,7 @@ const VAST_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </Ad>
 </VAST>`;
 
-// OpenRTB response template
-const OPENRTB_RESPONSE = {
-  id: "test-response",
-  seatbid: [{
-    bid: [{
-      id: "test-bid-001",
-      impid: "test-imp-001",
-      price: 2.50,
-      adm: VAST_XML,
-      adid: "ctv-simulator-ad",
-      adomain: ["example.com"],
-      crid: "ctv-creative-001",
-      w: 1920,
-      h: 1080,
-      ext: {
-        prebid: {
-          type: "video"
-        }
-      }
-    }],
-    seat: "ctv-simulator"
-  }],
-  bidid: "test-bid-response",
-  cur: "GBP",
-  ext: {
-    responsetimemillis: {
-      "ctv-simulator": 50
-    }
-  }
-};
-
 export default function handler(req, res) {
-  const { pathname, query } = parse(req.url, true);
-  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -107,72 +71,9 @@ export default function handler(req, res) {
     return;
   }
 
-  console.log(`${new Date().toISOString()} - ${req.method} ${pathname}`);
+  console.log(`${new Date().toISOString()} - ${req.method} /api/vast`);
   console.log('Headers:', req.headers);
-  
-  if (req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    
-    req.on('end', () => {
-      try {
-        const requestData = JSON.parse(body);
-        console.log('Request Body:', JSON.stringify(requestData, null, 2));
-      } catch (e) {
-        console.log('Raw Body:', body);
-      }
-    });
-  }
 
-  switch (pathname) {
-    case '/api/vast':
-      res.setHeader('Content-Type', 'application/xml');
-      res.status(200).send(VAST_XML);
-      break;
-      
-    case '/api/openrtb':
-    case '/api/openrtb2/auction':
-      res.setHeader('Content-Type', 'application/json');
-      res.status(200).json(OPENRTB_RESPONSE);
-      break;
-      
-    case '/api/health':
-      res.setHeader('Content-Type', 'application/json');
-      res.status(200).json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        service: 'CTV Simulator API'
-      });
-      break;
-      
-    case '/api/timeout':
-      // Simulate timeout - don't respond
-      setTimeout(() => {
-        res.status(408).json({ error: 'Request timeout' });
-      }, 10000);
-      break;
-      
-    case '/api/error':
-      res.status(500).json({
-        error: 'Internal server error',
-        message: 'This is a test error endpoint'
-      });
-      break;
-      
-    default:
-      res.status(404).json({
-        error: 'Not found',
-        message: `Endpoint ${pathname} not found`,
-        availableEndpoints: [
-          '/api/vast',
-          '/api/openrtb',
-          '/api/openrtb2/auction',
-          '/api/health',
-          '/api/timeout',
-          '/api/error'
-        ]
-      });
-  }
+  res.setHeader('Content-Type', 'application/xml');
+  res.status(200).send(VAST_XML);
 } 
