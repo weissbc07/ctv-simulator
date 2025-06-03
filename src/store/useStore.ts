@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AdRequest, LogEntry, CTVConfig } from '../types';
 import { PREBID_DEMAND_SOURCES } from '../utils/prebidServer';
+import { VastCreative } from '../utils/vastParser';
 
 interface AppState {
   // CTV Configuration
@@ -31,6 +32,14 @@ interface AppState {
   setCurrentTime: (time: number) => void;
   duration: number;
   setDuration: (duration: number) => void;
+  
+  // Ad Playback State
+  currentAd: VastCreative | null;
+  setCurrentAd: (ad: VastCreative | null) => void;
+  isPlayingAd: boolean;
+  setIsPlayingAd: (playing: boolean) => void;
+  playAdCreative: (ad: VastCreative) => void;
+  stopAdPlayback: () => void;
 }
 
 const defaultCTVConfig: CTVConfig = {
@@ -106,4 +115,12 @@ export const useStore = create<AppState>((set) => ({
   setCurrentTime: (time) => set({ currentTime: time }),
   duration: 0,
   setDuration: (duration) => set({ duration: duration }),
+  
+  // Ad Playback State
+  currentAd: null,
+  setCurrentAd: (ad) => set({ currentAd: ad }),
+  isPlayingAd: false,
+  setIsPlayingAd: (playing) => set({ isPlayingAd: playing }),
+  playAdCreative: (ad) => set({ currentAd: ad }),
+  stopAdPlayback: () => set({ currentAd: null }),
 })); 

@@ -1,5 +1,17 @@
 # CTV Simulator - Vercel Deployment Guide
 
+## 🚀 Live Deployment
+
+**Production URL**: https://ctv-simulator.vercel.app
+
+## API Endpoints
+
+The following API endpoints are now live and functional:
+
+- **VAST**: `https://ctv-simulator.vercel.app/api/vast`
+- **OpenRTB Auction**: `https://ctv-simulator.vercel.app/api/openrtb2/auction`
+- **Health Check**: `https://ctv-simulator.vercel.app/api/health`
+
 ## Overview
 This guide explains how to deploy the CTV Simulator to Vercel with full prebid server functionality.
 
@@ -33,29 +45,22 @@ If you want to use a custom domain, configure it in the Vercel dashboard.
 ```
 ctv-simulator/
 ├── api/                    # Vercel serverless functions
-│   └── test-server.js     # API endpoints for testing
+│   ├── health.js          # Health check endpoint
+│   ├── vast.js            # VAST XML endpoint
+│   └── openrtb2/
+│       └── auction.js     # OpenRTB auction endpoint
 ├── src/                   # React application source
 ├── public/               # Static assets
 ├── vercel.json          # Vercel configuration
 └── package.json         # Dependencies and scripts
 ```
 
-## API Endpoints
-
-Once deployed, the following API endpoints will be available:
-
-- **VAST**: `https://your-app.vercel.app/api/vast`
-- **OpenRTB**: `https://your-app.vercel.app/api/openrtb2/auction`
-- **Health Check**: `https://your-app.vercel.app/api/health`
-- **Timeout Test**: `https://your-app.vercel.app/api/timeout`
-- **Error Test**: `https://your-app.vercel.app/api/error`
-
 ## Configuration
 
 ### Prebid Server Endpoints
 The application includes several prebid server endpoints:
 
-1. **Vercel API (Production)** - Your deployed API
+1. **Vercel API (Production)** - `https://ctv-simulator.vercel.app/api/openrtb2/auction`
 2. **Local Test Server** - For development
 3. **Prebid Server (US East)** - Rubicon's US server
 4. **Prebid Server (EU)** - Rubicon's EU server
@@ -68,6 +73,7 @@ The application includes several prebid server endpoints:
 - **IP**: UK-based IP address
 - **User Agent**: Samsung Smart TV user agent
 - **GDPR**: Enabled with consent string
+- **Default Endpoint**: Vercel Production API
 
 ## Features
 
@@ -86,14 +92,14 @@ The application includes several prebid server endpoints:
 - ✅ CTV-specific targeting
 
 ### Demand Sources
-1. One Tag
-2. PubMatic
-3. Rise
-4. Xandr Monetise (AppNexus)
-5. Magnite (Rubicon)
-6. Sovrn
-7. Amx
-8. Aniview
+1. One Tag (pubId: 770a10a1445c7df)
+2. PubMatic (adSlot: 6117737, publisherId: 165218)
+3. Rise (org: 6761a6098eb1b90001e9b1b5)
+4. Xandr Monetise/AppNexus (placementId: 35106313)
+5. Magnite/Rubicon (accountId: 26742, siteId: 579542, zoneId: 3686138)
+6. Sovrn (tagid: 1261560)
+7. Amx (tagId: zOPvsVMV4)
+8. Aniview (tagId: 67ea7a5e52e2cb011d0bbf78)
 
 ## Environment Variables
 
@@ -111,21 +117,41 @@ No environment variables are required for basic deployment. All configuration is
 - Success/error rates
 - Demand source performance
 
+## Testing the Deployment
+
+### Health Check
+```bash
+curl https://ctv-simulator.vercel.app/api/health
+```
+
+### VAST Endpoint
+```bash
+curl https://ctv-simulator.vercel.app/api/vast
+```
+
+### OpenRTB Auction
+```bash
+curl -X POST https://ctv-simulator.vercel.app/api/openrtb2/auction \
+  -H "Content-Type: application/json" \
+  -d '{"id":"test-request","imp":[{"id":"test-imp"}]}'
+```
+
 ## Troubleshooting
 
 ### Common Issues
 
 1. **CORS Errors**
-   - Ensure API endpoints have proper CORS headers
-   - Check Vercel function configuration
+   - All API endpoints include proper CORS headers
+   - Check browser console for specific errors
 
 2. **Timeout Issues**
    - Adjust timeout settings in prebid configuration
-   - Monitor Vercel function execution time
+   - Monitor Vercel function execution time (max 10s for hobby plan)
 
 3. **Build Errors**
    - Check Node.js version compatibility
    - Verify all dependencies are installed
+   - Run `npm run build` locally first
 
 ### Support
 For issues with deployment or configuration, check:
@@ -169,4 +195,16 @@ git push origin main
 vercel --prod
 ```
 
-Vercel will automatically deploy updates when you push to your main branch. 
+Vercel will automatically deploy updates when you push to your main branch.
+
+## Success! 🎉
+
+Your CTV Simulator is now live at: **https://ctv-simulator.vercel.app**
+
+The application includes:
+- Full CTV device emulation
+- 8 prebid demand sources
+- Supply chain transparency (schain)
+- GDPR/CCPA compliance
+- Real-time ad request testing
+- Comprehensive logging and monitoring 

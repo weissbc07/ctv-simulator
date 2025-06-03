@@ -470,4 +470,158 @@ export interface PrebidServerRequest {
       };
     };
   };
+}
+
+// Google AdX Integration Types
+export interface AdXConfig {
+  publisherId: string;
+  adUnitPath: string;
+  networkCode: string;
+  serviceAccountKey?: string;
+  enablePAL: boolean;
+  useRealGAM?: boolean;
+  firstPartyData?: Record<string, any>;
+  publisherDomain?: string;
+  contentPageUrl?: string;
+  videoContentId?: string;
+  videoCMSId?: string;
+  videoPosition?: 'preroll' | 'midroll' | 'postroll';
+  sessionId?: string;
+  omidPartnerName?: string;
+  omidPartnerVersion?: string;
+  tagForUnderAge?: string;
+  customParams?: Record<string, any>;
+  palConfig?: PALConfig;
+}
+
+export interface PALConfig {
+  descriptionUrl: string;
+  privacyPolicy: string;
+  playerType: 'web' | 'ctv' | 'mobile';
+  playerName: string;
+  playerVersion: string;
+  videoWidth: number;
+  videoHeight: number;
+  videoTitle?: string;
+  videoDescription?: string;
+  videoDuration?: number;
+  contentRating?: string;
+  isLive?: boolean;
+  ctvProvider?: CTVProvider;
+}
+
+export interface CTVProvider {
+  name: string;
+  type: 'roku' | 'samsung' | 'lg' | 'firetv' | 'androidtv' | 'appletv' | 'tizen' | 'webos' | 'other';
+  deviceModel?: string;
+  osVersion?: string;
+  appVersion?: string;
+  userAgent: string;
+  capabilities: {
+    drm: string[];
+    video: {
+      codecs: string[];
+      profiles: string[];
+      hdr: boolean;
+      resolution: string[];
+    };
+    audio: {
+      codecs: string[];
+      channels: number[];
+    };
+  };
+}
+
+export interface AdXRequest {
+  adUnitCode: string;
+  sizes: number[][];
+  video: {
+    playerSize: number[][];
+    context: 'instream' | 'outstream' | 'adpod';
+    mimes: string[];
+    protocols: number[];
+    minduration: number;
+    maxduration: number;
+    startdelay?: number;
+    placement?: number;
+    linearity?: number;
+    skip?: number;
+    skipmin?: number;
+    skipafter?: number;
+    playbackmethod?: number[];
+    api?: number[];
+  };
+  gdpr?: {
+    consentString?: string;
+    gdprApplies?: boolean;
+  };
+  uspConsent?: string;
+  schain?: any;
+  userId?: Record<string, any>;
+  ortb2?: any;
+  ortb2Imp?: any;
+  pal?: {
+    nonce: string;
+    adSessionId: string;
+  };
+}
+
+export interface AdXResponse {
+  requestId: string;
+  adUnitCode: string;
+  cpm: number;
+  currency: string;
+  width: number;
+  height: number;
+  vastXml?: string;
+  vastUrl?: string;
+  dealId?: string;
+  creativeId: string;
+  netRevenue: boolean;
+  ttl: number;
+  meta?: {
+    advertiserDomains?: string[];
+    brandName?: string;
+    networkName?: string;
+    primaryCatId?: string;
+    secondaryCatIds?: string[];
+    mediaType?: string;
+  };
+  adServerTargeting?: Record<string, any>;
+  pal?: {
+    verified: boolean;
+    adSessionId: string;
+    impressionUrl?: string;
+  };
+}
+
+export interface PALNonceRequest {
+  descriptionUrl: string;
+  privacyPolicy: string;
+  playerType: string;
+  playerName: string;
+  playerVersion: string;
+  videoWidth: number;
+  videoHeight: number;
+  videoTitle?: string;
+  videoDescription?: string;
+  videoDuration?: number;
+  contentRating?: string;
+  isLive?: boolean;
+  sessionId?: string;
+  iconsSupported?: boolean;
+  omidPartnerName?: string;
+  omidPartnerVersion?: string;
+  supportedApiFrameworks?: string[];
+}
+
+export interface PALNonceResponse {
+  nonce: string;
+  adSessionId: string;
+  videoSessionId: string;
+  settings: {
+    numRedirectsRemaining: number;
+    enabledEventTypes: string[];
+    nonceExpiry: number;
+  };
 } 

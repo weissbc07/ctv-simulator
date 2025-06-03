@@ -386,7 +386,6 @@ export const makePrebidServerRequest = async (
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'User-Agent': config.userAgent,
       'X-Forwarded-For': config.ip,
       'Accept': 'application/json'
     },
@@ -398,7 +397,10 @@ export const makePrebidServerRequest = async (
     adRequest.payload = payload;
     
     const response = await axios.post(config.prebidServerConfig.endpoint, payload, {
-      headers: adRequest.headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       timeout: config.prebidServerConfig.timeout || 5000
     });
     
