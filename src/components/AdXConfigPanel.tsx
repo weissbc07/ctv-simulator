@@ -418,10 +418,13 @@ const AdXConfigPanel: React.FC<AdXConfigPanelProps> = ({ onConfigChange, onTestR
             <div className="flex items-center">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
               <div>
-                <h4 className="text-sm font-medium text-yellow-800">🎬 Demo Mode Active</h4>
+                <h4 className="text-sm font-medium text-yellow-800">🎬 Enhanced Demo Mode Active</h4>
                 <p className="text-xs text-yellow-700 mt-1">
-                  Using real VAST ads from demo endpoints (Google Ad Manager, SpotX). 
-                  Configure exchange credentials above to enable live programmatic auctions.
+                  Using <strong>real Prebid bidder configurations</strong> (OneTag, PubMatic, Rise, Xandr, Magnite, Sovrn, AMX, Aniview) 
+                  + real VAST ads from Google Ad Manager and SpotX demo endpoints.
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  🎯 <strong>Realistic auction simulation:</strong> Device preferences, bidder-specific CPM ranges, platform targeting, and primetime adjustments.
                 </p>
               </div>
             </div>

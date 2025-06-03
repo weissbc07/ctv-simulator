@@ -625,4 +625,199 @@ export interface PALNonceResponse {
     enabledEventTypes: string[];
     nonceExpiry: number;
   };
+}
+
+// DAI (Dynamic Ad Insertion) Types
+export interface DAIConfig {
+  enabled: boolean;
+  authKeys: DAIAuthKey[];
+  streamFormat: 'hls' | 'dash';
+  contentSourceId?: string;
+  videoId?: string;
+  cmsId?: string;
+  enableServerSideBeaconing?: boolean;
+  apiKey?: string;
+  hmacKey?: string;
+  streamUrl?: string;
+  fallbackStreamUrl?: string;
+  adBreakConfiguration?: AdBreakConfig;
+  customAssetKey?: string;
+}
+
+export interface DAIAuthKey {
+  id: string;
+  name: string;
+  type: 'api' | 'hmac';
+  key: string;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  lastUsed?: Date;
+  description?: string;
+}
+
+export interface AdBreakConfig {
+  preRoll?: boolean;
+  midRoll?: {
+    enabled: boolean;
+    positions: number[]; // Time positions in seconds
+    frequency?: number; // Every N seconds
+  };
+  postRoll?: boolean;
+  maxAdsPerBreak?: number;
+  maxAdDuration?: number;
+}
+
+export interface DAIStreamRequest {
+  contentSourceId?: string;
+  videoId?: string;
+  cmsId?: string;
+  authToken?: string;
+  apiKey?: string;
+  format: 'hls' | 'dash';
+  adTagParameters?: Record<string, string>;
+  streamActivityMonitorId?: string;
+  sessionId?: string;
+  userId?: string;
+  customAssetKey?: string;
+  streamUrl?: string;
+}
+
+export interface DAIStreamResponse {
+  streamUrl: string;
+  streamId: string;
+  duration?: number;
+  adBreaks?: AdBreak[];
+  trackingUrls?: {
+    contentTracking?: string;
+    adTracking?: string;
+    errorTracking?: string;
+  };
+  metadata?: {
+    contentTitle?: string;
+    contentDescription?: string;
+    contentDuration?: number;
+    adBreakCount?: number;
+  };
+}
+
+export interface AdBreak {
+  id: string;
+  startTime: number; // seconds
+  duration: number;
+  adCount: number;
+  type: 'preroll' | 'midroll' | 'postroll';
+  ads?: DAIAd[];
+}
+
+export interface DAIAd {
+  id: string;
+  duration: number;
+  title?: string;
+  advertiser?: string;
+  creativeId?: string;
+  lineItemId?: string;
+  clickThroughUrl?: string;
+  trackingEvents?: {
+    [eventType: string]: string[];
+  };
+}
+
+export interface HLSManifest {
+  version: number;
+  targetDuration: number;
+  mediaSequence: number;
+  playlistType?: string;
+  segments: HLSSegment[];
+  adBreaks?: HLSAdBreak[];
+  isDynamic?: boolean;
+  endList?: boolean;
+}
+
+export interface HLSSegment {
+  uri: string;
+  duration: number;
+  sequence: number;
+  title?: string;
+  byteRange?: string;
+  key?: string;
+  programDateTime?: string;
+  discontinuity?: boolean;
+}
+
+export interface HLSAdBreak {
+  startTime: number;
+  duration: number;
+  adCount: number;
+  cueOut?: string;
+  cueIn?: string;
+  scte35?: string;
+}
+
+export interface DASHManifest {
+  mediaPresentationDuration: string;
+  minBufferTime: string;
+  profiles: string;
+  type?: 'static' | 'dynamic';
+  periods: DASHPeriod[];
+  adBreaks?: DASHAdBreak[];
+}
+
+export interface DASHPeriod {
+  id: string;
+  start: string;
+  duration: string;
+  adaptationSets: DASHAdaptationSet[];
+}
+
+export interface DASHAdaptationSet {
+  id: string;
+  mimeType: string;
+  contentType: 'video' | 'audio';
+  representations: DASHRepresentation[];
+}
+
+export interface DASHRepresentation {
+  id: string;
+  bandwidth: number;
+  width?: number;
+  height?: number;
+  frameRate?: string;
+  codecs?: string;
+  segmentTemplate?: {
+    media: string;
+    initialization: string;
+    timescale: number;
+    duration: number;
+    startNumber: number;
+  };
+}
+
+export interface DASHAdBreak {
+  periodId: string;
+  startTime: string;
+  duration: string;
+  adCount: number;
+}
+
+export interface DAIVideoPlayer {
+  loadStream: (streamUrl: string, config?: DAIConfig) => Promise<void>;
+  play: () => Promise<void>;
+  pause: () => void;
+  seek: (time: number) => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  getVolume: () => number;
+  setVolume: (volume: number) => void;
+  addEventListener: (event: string, callback: Function) => void;
+  removeEventListener: (event: string, callback: Function) => void;
+  destroy: () => void;
+}
+
+export interface DAIEvent {
+  type: 'adBreakStart' | 'adBreakEnd' | 'adStart' | 'adEnd' | 'streamLoaded' | 'error';
+  timestamp: Date;
+  data?: any;
+  adBreak?: AdBreak;
+  ad?: DAIAd;
+  error?: string;
 } 

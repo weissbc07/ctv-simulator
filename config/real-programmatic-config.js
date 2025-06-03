@@ -16,6 +16,159 @@ export const REAL_PROGRAMMATIC_CONFIG = {
     fallbackToDemo: true  // Falls back to demo ads if no real credentials
   },
 
+  // Real Prebid Bidder Configuration (from user's actual setup)
+  prebidBidders: {
+    onetag: {
+      bidder: 'onetag',
+      params: {
+        pubId: '770a10a1445c7df'
+      },
+      enabled: true
+    },
+    pubmatic: {
+      bidder: 'pubmatic',
+      params: {
+        publisherId: '6117737',
+        adSlot: '165218'
+      },
+      enabled: true
+    },
+    rise: {
+      bidder: 'rise',
+      params: {
+        org: '6761a6098eb1b90001e9b1b5'
+      },
+      enabled: true
+    },
+    appnexus: {
+      bidder: 'appnexus',
+      params: {
+        placementId: 35106313
+      },
+      enabled: true
+    },
+    rubicon: {
+      bidder: 'rubicon',
+      params: {
+        accountId: 26742,
+        siteId: 579542,
+        zoneId: 3686138
+      },
+      enabled: true
+    },
+    sovrn: {
+      bidder: 'sovrn',
+      params: {
+        tagid: '1261560'
+      },
+      enabled: true
+    },
+    amx: {
+      bidder: 'amx',
+      params: {
+        tagId: 'zOPvsVMV4'
+      },
+      enabled: true
+    },
+    aniview: {
+      bidder: 'aniview',
+      params: {
+        tagId: '67ea7a5e52e2cb011d0bbf78'
+      },
+      enabled: true
+    }
+  },
+
+  // Video Ad Unit Configuration (from user's setup)
+  videoAdUnit: {
+    mediaTypes: {
+      video: {
+        h: 1080,
+        w: 1920,
+        api: [],
+        pos: 1,
+        skip: 0,
+        mimes: ["video/mp4", "video/h264", "video/webm"],
+        delivery: [2],
+        linearity: 1,
+        protocols: [2, 3, 5, 6],
+        maxbitrate: 1500,
+        playerSize: [[1920, 1080]],
+        startdelay: 0,
+        maxduration: 60,
+        minduration: 5,
+        playbackmethod: [1, 3]
+      }
+    }
+  },
+
+  // OpenRTB Device Configuration
+  ortbDefaults: {
+    device: {
+      devicetype: 3 // CTV device type
+    }
+  },
+
+  // Platform-specific configurations (from user's override keys)
+  platformOverrides: {
+    'rakuten_tv': {
+      passthroughDefaults: {
+        an: "Rakuten TV",
+        url: "https%3A%2F%2F232373.axiommedia.co",
+        msid: "232373",
+        description_url: "https://www.rakuten.tv"
+      }
+    },
+    'lg_channels': {
+      passthroughDefaults: {
+        an: "LG Channels",
+        url: "https%3A%2F%2F474315.axiommedia.co",
+        msid: "474315",
+        description_url: "https://474315.adsenseformobileapps.com"
+      }
+    },
+    'samsung_tv_plus': {
+      passthroughDefaults: {
+        an: "SAMSUNG TV PLUS",
+        url: "https%3A%2F%2FG15147002586.axiommedia.co",
+        msid: "G15147002586",
+        description_url: "https://G15147002586.adsenseformobileapps.com"
+      }
+    },
+    'virgin_media': {
+      passthroughDefaults: {
+        an: "virginmedia.com",
+        url: "https%3A%2F%2Fcom.24i.Virginmedia.axiommedia.co",
+        msid: "com.24i.Virginmedia",
+        description_url: "https://com.24i.virginmedia.adsenseformobileapps.com"
+      }
+    },
+    'tivify': {
+      passthroughDefaults: {
+        an: "Tivify",
+        url: "https%3A%2F%2Fcom.tvup.tivify.app.tv.axiommedia.co",
+        msid: "com.tvup.tivify.app.tv",
+        description_url: "https://com.tvup.tivify.app.tv.adsenseformobileapps.com"
+      }
+    },
+    'freeview': {
+      passthroughDefaults: {
+        an: "Freeview",
+        url: "https%3A%2F%2Fcom.goseetv.freeview.x1.goseetv.media",
+        msid: "com.goseetv.freeview.x1",
+        description_url: "https://com.goseetv.freeview.x1.adsenseformobileapps.com"
+      }
+    },
+    'tcl_channel': {
+      passthroughDefaults: {
+        an: "TCL CHANNEL",
+        url: "https%3A%2F%2Fcom.tcl.waterfall.overseas.littledotstudios.com",
+        msid: "com.tcl.waterfall.overseas",
+        description_url: "https://com.tcl.waterfall.overseas.adsenseformobileapps.com"
+      }
+    }
+  },
+
   // Real Ad Exchange Credentials (REPLACE WITH YOUR ACTUAL CREDENTIALS)
   exchangeCredentials: {
     google_adx: {

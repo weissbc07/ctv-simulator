@@ -296,64 +296,78 @@ const server = http.createServer((req, res) => {
   } else if (pathname.startsWith('/api/adx/')) {
     const subPath = pathname.replace('/api/adx/', '');
     
-    if (subPath === 'pal/nonce') {
-      // PAL nonce generation
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk.toString();
-      });
+    if (subPath.startsWith('pal/')) {
+      // PAL SDK endpoints
+      const palPath = subPath.replace('pal/', '');
       
-      req.on('end', () => {
-        try {
-          const palRequest = JSON.parse(body);
-          console.log('PAL nonce request:', JSON.stringify(palRequest, null, 2));
-          
-          const palResponse = {
-            nonce: generatePALNonce(),
-            adSessionId: generateSessionId(),
-            videoSessionId: generateSessionId(),
-            settings: {
-              numRedirectsRemaining: 5,
-              enabledEventTypes: ['start', 'complete', 'error'],
-              nonceExpiry: Date.now() + 3600000 // 1 hour
-            }
-          };
-          
-          res.setHeader('Content-Type', 'application/json');
-          res.writeHead(200);
-          res.end(JSON.stringify(palResponse));
-        } catch (error) {
-          res.writeHead(400);
-          res.end(JSON.stringify({ error: 'Invalid JSON' }));
-        }
-      });
-      
-    } else if (subPath === 'pal/verify') {
-      // PAL verification
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk.toString();
-      });
-      
-      req.on('end', () => {
-        try {
-          const { adSessionId, nonce } = JSON.parse(body);
-          console.log('PAL verification request:', { adSessionId, nonce });
-          
-          const verification = {
-            verified: true,
-            adSessionId: adSessionId,
-            impressionUrl: `https://googleads.g.doubleclick.net/pagead/viewthroughconversion/123456/?pal_session=${adSessionId}`
-          };
-          
-          res.setHeader('Content-Type', 'application/json');
-          res.writeHead(200);
-          res.end(JSON.stringify(verification));
-        } catch (error) {
-          res.writeHead(400);
-          res.end(JSON.stringify({ error: 'Invalid JSON' }));
-        }
-      });
+      if (palPath === 'nonce') {
+        // PAL nonce generation
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+          try {
+            const palRequest = JSON.parse(body);
+            console.log('PAL nonce request:', JSON.stringify(palRequest, null, 2));
+            
+            const palResponse = {
+              nonce: generatePALNonce(),
+              adSessionId: generateSessionId(),
+              timestamp: new Date().toISOString(),
+              expiresIn: 3600,
+              playerConfig: palRequest
+            };
+            
+            res.setHeader('Content-Type', 'application/json');
+            res.writeHead(200);
+            res.end(JSON.stringify(palResponse));
+          } catch (error) {
+            console.error('Error processing PAL nonce request:', error);
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+        
+      } else if (palPath === 'verify') {
+        // PAL verification
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+          try {
+            const verifyRequest = JSON.parse(body);
+            console.log('PAL verify request:', JSON.stringify(verifyRequest, null, 2));
+            
+            const verifyResponse = {
+              verified: true,
+              adSessionId: verifyRequest.adSessionId || generateSessionId(),
+              signals: [
+                'userAgent',
+                'viewport',
+                'timing',
+                'network'
+              ],
+              timestamp: new Date().toISOString()
+            };
+            
+            res.setHeader('Content-Type', 'application/json');
+            res.writeHead(200);
+            res.end(JSON.stringify(verifyResponse));
+          } catch (error) {
+            console.error('Error processing PAL verify request:', error);
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+        
+      } else {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'PAL endpoint not found' }));
+      }
       
     } else if (subPath === 'request') {
       // AdX ad request
@@ -451,6 +465,200 @@ const server = http.createServer((req, res) => {
     } else {
       res.writeHead(404);
       res.end(JSON.stringify({ error: 'AdX endpoint not found' }));
+    }
+    
+  // DAI (Dynamic Ad Insertion) endpoints
+  } else if (pathname.startsWith('/api/dai/')) {
+    const subPath = pathname.replace('/api/dai/', '');
+    
+    if (subPath === 'stream/request') {
+      // DAI stream request
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      
+      req.on('end', () => {
+        try {
+          const streamRequest = JSON.parse(body);
+          console.log('DAI stream request:', JSON.stringify(streamRequest, null, 2));
+          
+          // Generate mock DAI stream response
+          const streamResponse = {
+            streamId: `stream_${generateRequestId()}`,
+            streamUrl: generateDAIStreamUrl(streamRequest),
+            duration: 1800, // 30 minutes
+            adBreaks: generateMockAdBreaks(),
+            trackingUrls: {
+              contentTracking: `http://localhost:8081/api/dai/tracking/content/${generateRequestId()}`,
+              adTracking: `http://localhost:8081/api/dai/tracking/ad/${generateRequestId()}`,
+              errorTracking: `http://localhost:8081/api/dai/tracking/error/${generateRequestId()}`
+            },
+            metadata: {
+              contentTitle: 'CTV Demo Content',
+              contentDescription: 'Sample CTV content with dynamic ad insertion',
+              contentDuration: 1800,
+              adBreakCount: 4
+            }
+          };
+          
+          console.log('DAI stream response:', JSON.stringify(streamResponse, null, 2));
+          
+          res.setHeader('Content-Type', 'application/json');
+          res.writeHead(200);
+          res.end(JSON.stringify(streamResponse));
+          
+        } catch (error) {
+          console.error('Error processing DAI stream request:', error);
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        }
+      });
+      
+    } else if (subPath === 'stitch') {
+      // Manifest stitching endpoint
+      const urlParams = new URLSearchParams(parsedUrl.query);
+      const streamUrl = urlParams.get('streamUrl');
+      const format = urlParams.get('format') || 'hls';
+      
+      if (!streamUrl) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Stream URL required' }));
+        return;
+      }
+      
+      console.log(`DAI stitching request: ${format} - ${streamUrl}`);
+      
+      // Generate stitched manifest
+      if (format === 'hls') {
+        const stitchedManifest = generateStitchedHLSManifest(streamUrl);
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.writeHead(200);
+        res.end(stitchedManifest);
+      } else if (format === 'dash') {
+        const stitchedManifest = generateStitchedDASHManifest(streamUrl);
+        res.setHeader('Content-Type', 'application/dash+xml');
+        res.writeHead(200);
+        res.end(stitchedManifest);
+      } else {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Unsupported format' }));
+      }
+      
+    } else if (subPath.startsWith('tracking/')) {
+      // Ad tracking endpoints
+      const trackingPath = subPath.replace('tracking/', '');
+      const [trackingType, trackingId] = trackingPath.split('/');
+      
+      console.log(`DAI tracking event: ${trackingType} - ${trackingId}`);
+      console.log('Headers:', JSON.stringify(req.headers, null, 2));
+      
+      // Log tracking event
+      const trackingEvent = {
+        type: trackingType,
+        id: trackingId,
+        timestamp: new Date().toISOString(),
+        userAgent: req.headers['user-agent'],
+        ip: req.connection.remoteAddress,
+        referer: req.headers.referer
+      };
+      
+      console.log('Tracking event logged:', JSON.stringify(trackingEvent, null, 2));
+      
+      // Return 1x1 pixel for impression tracking
+      if (trackingType === 'impression' || trackingType === 'ad') {
+        const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+        res.setHeader('Content-Type', 'image/gif');
+        res.setHeader('Content-Length', pixel.length);
+        res.writeHead(200);
+        res.end(pixel);
+      } else {
+        res.writeHead(200);
+        res.end('OK');
+      }
+      
+    } else if (subPath === 'auth/keys') {
+      // Authentication keys management
+      if (req.method === 'GET') {
+        // List auth keys (mock)
+        const mockKeys = [
+          {
+            id: 'key_001',
+            name: 'Production API Key',
+            type: 'api',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            description: 'Main production API key for DAI'
+          },
+          {
+            id: 'key_002',
+            name: 'HMAC Test Key',
+            type: 'hmac',
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            description: 'HMAC key for testing authentication'
+          }
+        ];
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.writeHead(200);
+        res.end(JSON.stringify(mockKeys));
+        
+      } else if (req.method === 'POST') {
+        // Create new auth key
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+          try {
+            const keyRequest = JSON.parse(body);
+            const newKey = {
+              id: `key_${generateRequestId()}`,
+              name: keyRequest.name,
+              type: keyRequest.type,
+              key: keyRequest.type === 'api' ? generateAPIKey() : generateHMACKey(),
+              status: 'active',
+              createdAt: new Date().toISOString(),
+              description: keyRequest.description
+            };
+            
+            console.log('DAI auth key created:', JSON.stringify(newKey, null, 2));
+            
+            res.setHeader('Content-Type', 'application/json');
+            res.writeHead(201);
+            res.end(JSON.stringify(newKey));
+            
+          } catch (error) {
+            console.error('Error creating DAI auth key:', error);
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+      }
+      
+    } else if (subPath === 'health') {
+      // DAI health check
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        status: 'healthy',
+        service: 'Dynamic Ad Insertion (DAI)',
+        features: [
+          'authentication_keys',
+          'stream_stitching',
+          'hls_manifest_parsing',
+          'dash_manifest_parsing',
+          'ad_break_detection',
+          'tracking_beacons'
+        ],
+        timestamp: new Date().toISOString()
+      }));
+      
+    } else {
+      res.writeHead(404);
+      res.end(JSON.stringify({ error: 'DAI endpoint not found' }));
     }
     
   // Mock OpenRTB endpoint (including Prebid Server)
@@ -556,4 +764,273 @@ server.listen(PORT, () => {
   console.log('🎯 For Prebid Server testing, use: http://localhost:8081/openrtb2/auction');
   console.log('🔒 For AdX + PAL testing, configure in the AdX + PAL tab!');
   console.log('Use these endpoints in the CTV Simulator for testing!');
-}); 
+});
+
+// DAI Helper Functions
+function generateDAIStreamUrl(request) {
+  const baseUrl = 'https://dai.google.com';
+  const format = request.format === 'hls' ? 'hls' : 'dash';
+  const extension = format === 'hls' ? 'm3u8' : 'mpd';
+  
+  if (request.contentSourceId && request.videoId) {
+    // VOD stream
+    let streamUrl = `${baseUrl}/ondemand/${format}/content/${request.contentSourceId}/vid/${request.videoId}/master.${extension}`;
+    
+    if (request.apiKey) {
+      streamUrl += `?api-key=${request.apiKey}`;
+    }
+    
+    return streamUrl;
+  } else if (request.customAssetKey) {
+    // Live stream
+    let streamUrl = `${baseUrl}/linear/${format}/event/${request.customAssetKey}/stream.${extension}`;
+    
+    if (request.apiKey) {
+      streamUrl += `?api-key=${request.apiKey}`;
+    }
+    
+    return streamUrl;
+  } else {
+    // Custom stitching
+    return `http://localhost:8081/api/dai/stitch?streamUrl=${encodeURIComponent(request.streamUrl || '')}&format=${format}`;
+  }
+}
+
+function generateMockAdBreaks() {
+  return [
+    {
+      id: 'preroll_001',
+      startTime: 0,
+      duration: 30,
+      adCount: 1,
+      type: 'preroll',
+      ads: [
+        {
+          id: 'ad_001',
+          duration: 30,
+          title: 'Premium Brand Ad',
+          advertiser: 'Premium Brand',
+          creativeId: 'creative_001',
+          lineItemId: 'line_001'
+        }
+      ]
+    },
+    {
+      id: 'midroll_001',
+      startTime: 300,
+      duration: 60,
+      adCount: 2,
+      type: 'midroll',
+      ads: [
+        {
+          id: 'ad_002',
+          duration: 30,
+          title: 'Tech Product Ad',
+          advertiser: 'Tech Company',
+          creativeId: 'creative_002',
+          lineItemId: 'line_002'
+        },
+        {
+          id: 'ad_003',
+          duration: 30,
+          title: 'Food Brand Ad',
+          advertiser: 'Food Brand',
+          creativeId: 'creative_003',
+          lineItemId: 'line_003'
+        }
+      ]
+    },
+    {
+      id: 'midroll_002',
+      startTime: 900,
+      duration: 30,
+      adCount: 1,
+      type: 'midroll',
+      ads: [
+        {
+          id: 'ad_004',
+          duration: 30,
+          title: 'Auto Brand Ad',
+          advertiser: 'Auto Company',
+          creativeId: 'creative_004',
+          lineItemId: 'line_004'
+        }
+      ]
+    },
+    {
+      id: 'postroll_001',
+      startTime: 1770,
+      duration: 30,
+      adCount: 1,
+      type: 'postroll',
+      ads: [
+        {
+          id: 'ad_005',
+          duration: 30,
+          title: 'Entertainment Ad',
+          advertiser: 'Entertainment Corp',
+          creativeId: 'creative_005',
+          lineItemId: 'line_005'
+        }
+      ]
+    }
+  ];
+}
+
+function generateStitchedHLSManifest(originalUrl) {
+  return `#EXTM3U
+#EXT-X-VERSION:6
+#EXT-X-TARGETDURATION:10
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+
+# Pre-roll ad break
+#EXT-X-CUE-OUT:30.000
+#EXT-X-DISCONTINUITY
+#EXTINF:10.000,
+ad_preroll_001.ts
+#EXTINF:10.000,
+ad_preroll_002.ts
+#EXTINF:10.000,
+ad_preroll_003.ts
+#EXT-X-CUE-IN
+#EXT-X-DISCONTINUITY
+
+# Content segments
+#EXTINF:10.000,
+content_001.ts
+#EXTINF:10.000,
+content_002.ts
+#EXTINF:10.000,
+content_003.ts
+#EXTINF:10.000,
+content_004.ts
+#EXTINF:10.000,
+content_005.ts
+
+# Mid-roll ad break at 5 minutes
+#EXT-X-CUE-OUT:60.000
+#EXT-X-DISCONTINUITY
+#EXTINF:10.000,
+ad_midroll_001.ts
+#EXTINF:10.000,
+ad_midroll_002.ts
+#EXTINF:10.000,
+ad_midroll_003.ts
+#EXTINF:10.000,
+ad_midroll_004.ts
+#EXTINF:10.000,
+ad_midroll_005.ts
+#EXTINF:10.000,
+ad_midroll_006.ts
+#EXT-X-CUE-IN
+#EXT-X-DISCONTINUITY
+
+# More content segments
+#EXTINF:10.000,
+content_006.ts
+#EXTINF:10.000,
+content_007.ts
+#EXTINF:10.000,
+content_008.ts
+#EXTINF:10.000,
+content_009.ts
+#EXTINF:10.000,
+content_010.ts
+
+# Post-roll ad break
+#EXT-X-CUE-OUT:30.000
+#EXT-X-DISCONTINUITY
+#EXTINF:10.000,
+ad_postroll_001.ts
+#EXTINF:10.000,
+ad_postroll_002.ts
+#EXTINF:10.000,
+ad_postroll_003.ts
+#EXT-X-CUE-IN
+
+#EXT-X-ENDLIST`;
+}
+
+function generateStitchedDASHManifest(originalUrl) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" 
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="urn:mpeg:dash:schema:mpd:2011 DASH-MPD.xsd"
+     type="static"
+     mediaPresentationDuration="PT30M"
+     minBufferTime="PT4S"
+     profiles="urn:mpeg:dash:profile:isoff-main:2011">
+     
+  <!-- Pre-roll Ad Period -->
+  <Period id="preroll" start="PT0S" duration="PT30S">
+    <AdaptationSet mimeType="video/mp4" contentType="video">
+      <Representation id="preroll-video" bandwidth="1000000" width="1920" height="1080">
+        <SegmentTemplate media="preroll_$Number$.m4s" initialization="preroll_init.m4s" 
+                        timescale="1000" duration="10000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  
+  <!-- Content Period 1 -->
+  <Period id="content1" start="PT30S" duration="PT5M">
+    <AdaptationSet mimeType="video/mp4" contentType="video">
+      <Representation id="content1-video" bandwidth="2000000" width="1920" height="1080">
+        <SegmentTemplate media="content1_$Number$.m4s" initialization="content1_init.m4s" 
+                        timescale="1000" duration="10000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  
+  <!-- Mid-roll Ad Period -->
+  <Period id="midroll1" start="PT5M30S" duration="PT1M">
+    <AdaptationSet mimeType="video/mp4" contentType="video">
+      <Representation id="midroll1-video" bandwidth="1000000" width="1920" height="1080">
+        <SegmentTemplate media="midroll1_$Number$.m4s" initialization="midroll1_init.m4s" 
+                        timescale="1000" duration="10000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  
+  <!-- Content Period 2 -->
+  <Period id="content2" start="PT6M30S" duration="PT23M">
+    <AdaptationSet mimeType="video/mp4" contentType="video">
+      <Representation id="content2-video" bandwidth="2000000" width="1920" height="1080">
+        <SegmentTemplate media="content2_$Number$.m4s" initialization="content2_init.m4s" 
+                        timescale="1000" duration="10000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  
+  <!-- Post-roll Ad Period -->
+  <Period id="postroll" start="PT29M30S" duration="PT30S">
+    <AdaptationSet mimeType="video/mp4" contentType="video">
+      <Representation id="postroll-video" bandwidth="1000000" width="1920" height="1080">
+        <SegmentTemplate media="postroll_$Number$.m4s" initialization="postroll_init.m4s" 
+                        timescale="1000" duration="10000" startNumber="1"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+  
+</MPD>`;
+}
+
+function generateAPIKey() {
+  // Generate a 64-character API key similar to Google Ad Manager format
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let key = '';
+  for (let i = 0; i < 64; i++) {
+    key += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return key;
+}
+
+function generateHMACKey() {
+  // Generate a 32-character HMAC secret key
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let key = '';
+  for (let i = 0; i < 32; i++) {
+    key += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return key;
+} 

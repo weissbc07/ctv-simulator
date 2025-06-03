@@ -598,52 +598,351 @@ export class RealProgrammaticService {
 </VAST>`;
   }
 
-  // NEW: Demo mode for testing with real VAST ads
+  // NEW: Demo mode for testing with real VAST ads and bidder configurations
   async runDemoMode(adRequest, ctvProvider, contentContext) {
+    console.log('🎬 DEMO MODE: Using real Prebid bidder configurations');
+    
     const auctionId = this.generateAuctionId();
     const startTime = performance.now();
     
-    console.log(`🎬 Running DEMO MODE with Real VAST Ads: ${auctionId}`);
-    console.log(`📱 Device: ${ctvProvider.name} (${ctvProvider.type})`);
-    
     try {
-      // Fetch real VAST ads from demo endpoints
+      // Import real bidder configuration
+      const { REAL_PROGRAMMATIC_CONFIG } = await import('../config/real-programmatic-config.js');
+      const bidders = REAL_PROGRAMMATIC_CONFIG.prebidBidders;
+      
+      // Generate demo bids using real bidder configurations
+      const demoBids = await this.generateRealBidderDemoBids(bidders, adRequest, ctvProvider, contentContext);
+      
+      // Fetch actual demo VAST ads from real endpoints
       const demoAds = await this.fetchDemoVastAds(adRequest, ctvProvider);
       
-      if (demoAds.length === 0) {
+      // Combine bidder demo bids with real VAST demo ads
+      const allBids = [...demoBids, ...demoAds];
+      
+      if (allBids.length === 0) {
         throw new Error('No demo ads available');
       }
       
-      // Simulate auction with real ads
-      const winner = this.selectDemoWinner(demoAds);
-      const clearingPrice = this.calculateDemoCpm(winner, ctvProvider);
+      // Select winner using real auction mechanics
+      const winner = this.selectDemoWinner(allBids);
       
-      const endTime = performance.now();
-      console.log(`🏆 Demo Auction Complete: ${(endTime - startTime).toFixed(2)}ms`);
-      console.log(`💰 Demo Winner: ${winner.source} - $${clearingPrice.toFixed(2)} CPM`);
-      console.log(`🎬 Real VAST Retrieved: ${winner.vastXml ? 'Yes' : 'No'}`);
+      // Calculate realistic CPM with bidder-specific adjustments
+      const clearingPrice = this.calculateAdvancedDemoCpm(winner, ctvProvider, contentContext);
       
-      return {
+      const auctionResult = {
         auctionId,
+        isDemoMode: true,
         winner: {
-          ...winner,
-          exchangeName: winner.source,
-          exchangeId: winner.sourceId
+          id: winner.id || winner.adId,
+          bidder: winner.bidder || winner.source,
+          price: clearingPrice,
+          adm: winner.vastXml,
+          vastXml: winner.vastXml,
+          crid: winner.creativeId || winner.adId,
+          w: 1920,
+          h: 1080,
+          adomain: winner.advertiserDomains || ['demo-advertiser.com'],
+          cat: winner.categories || ['IAB1']
         },
         clearingPrice,
-        totalBidders: demoAds.length,
-        runnerUpPrice: clearingPrice * 0.8,
         vastXml: winner.vastXml,
-        timestamp: Date.now(),
-        isDemoMode: true
+        participatingBidders: allBids.length,
+        auctionTime: performance.now() - startTime,
+        metadata: {
+          realBidders: Object.keys(bidders).filter(b => bidders[b].enabled),
+          demoEndpoints: ['Google Ad Manager', 'SpotX', 'JW Player'],
+          platformOverride: this.getPlatformOverride(ctvProvider),
+          winnerType: winner.bidder ? 'bidder_demo' : 'vast_demo'
+        }
       };
       
+      const endTime = performance.now();
+      console.log(`🏆 Enhanced Demo Auction Complete: ${(endTime - startTime).toFixed(2)}ms`);
+      console.log(`💰 Demo Winner: ${winner.bidder || winner.source} - $${clearingPrice.toFixed(2)} CPM`);
+      console.log(`📊 Total Bids: ${allBids.length} (${demoBids.length} bidders + ${demoAds.length} demo ads)`);
+      
+      return auctionResult;
+      
     } catch (error) {
-      console.error('❌ Demo Mode Error:', error);
-      throw error;
+      console.error('❌ Enhanced demo mode error:', error);
+      // Fallback to basic demo ad
+      return this.generateFallbackDemoAuction(auctionId);
     }
   }
-  
+
+  // Generate demo bids using real bidder configurations
+  async generateRealBidderDemoBids(bidders, adRequest, ctvProvider, contentContext) {
+    const demoBids = [];
+    
+    console.log(`🎯 Generating demo bids for ${Object.keys(bidders).length} configured bidders`);
+    
+    for (const [bidderName, config] of Object.entries(bidders)) {
+      if (!config.enabled) continue;
+      
+      try {
+        const bid = await this.generateBidderDemoBid(bidderName, config, adRequest, ctvProvider, contentContext);
+        if (bid) {
+          demoBids.push(bid);
+          console.log(`✅ ${bidderName}: $${bid.cpm.toFixed(2)} CPM`);
+        } else {
+          console.log(`⚪ ${bidderName}: No bid`);
+        }
+      } catch (error) {
+        console.log(`⚠️  Demo bid generation failed for ${bidderName}:`, error.message);
+      }
+    }
+    
+    return demoBids;
+  }
+
+  // Generate individual bidder demo bid
+  async generateBidderDemoBid(bidderName, config, adRequest, ctvProvider, contentContext) {
+    // Simulate realistic bid probability (some bidders don't always bid)
+    const bidProbability = this.getBidderResponseProbability(bidderName);
+    if (Math.random() > bidProbability) {
+      return null; // No bid from this bidder
+    }
+    
+    const baseCpm = this.getBidderBaseCPM(bidderName);
+    const adjustments = this.calculateBidderAdjustments(bidderName, ctvProvider, contentContext);
+    const finalCpm = baseCpm * adjustments;
+    
+    // Generate realistic VAST using bidder-specific templates
+    const vastXml = this.generateBidderSpecificVAST(bidderName, config.params, finalCpm);
+    
+    return {
+      id: `${bidderName}_${this.generateRequestId()}`,
+      bidder: bidderName,
+      cpm: finalCpm,
+      vastXml,
+      creativeId: `${bidderName}_creative_${Date.now()}`,
+      advertiserDomains: this.getBidderAdvertiserDomains(bidderName),
+      categories: ['IAB1', 'IAB1-5'], // Entertainment
+      width: 1920,
+      height: 1080,
+      dealId: Math.random() > 0.8 ? `PMP_${bidderName}_${Math.floor(Math.random() * 1000)}` : null,
+      metadata: {
+        bidderParams: config.params,
+        responseTime: Math.floor(Math.random() * 800) + 200 // 200-1000ms
+      }
+    };
+  }
+
+  // Get bidder response probability (realistic bid rates)
+  getBidderResponseProbability(bidderName) {
+    const probabilities = {
+      'onetag': 0.85,
+      'pubmatic': 0.90,
+      'rise': 0.75,
+      'appnexus': 0.88,
+      'rubicon': 0.92,
+      'sovrn': 0.70,
+      'amx': 0.80,
+      'aniview': 0.85
+    };
+    return probabilities[bidderName] || 0.75;
+  }
+
+  // Get bidder base CPM (realistic ranges per bidder)
+  getBidderBaseCPM(bidderName) {
+    const baseCpms = {
+      'onetag': 2.50 + Math.random() * 3.00,    // $2.50-5.50
+      'pubmatic': 1.80 + Math.random() * 4.00,  // $1.80-5.80
+      'rise': 2.20 + Math.random() * 2.50,      // $2.20-4.70
+      'appnexus': 2.00 + Math.random() * 3.50,  // $2.00-5.50
+      'rubicon': 1.90 + Math.random() * 3.80,   // $1.90-5.70
+      'sovrn': 1.50 + Math.random() * 2.00,     // $1.50-3.50
+      'amx': 2.10 + Math.random() * 2.90,       // $2.10-5.00
+      'aniview': 1.70 + Math.random() * 3.30    // $1.70-5.00
+    };
+    return baseCpms[bidderName] || (1.50 + Math.random() * 3.00);
+  }
+
+  // Calculate bidder-specific adjustments
+  calculateBidderAdjustments(bidderName, ctvProvider, contentContext) {
+    let multiplier = 1.0;
+    
+    // Device type preferences (some bidders prefer certain platforms)
+    const devicePreferences = {
+      'samsung': { 'pubmatic': 1.15, 'rubicon': 1.10, 'appnexus': 1.12 },
+      'roku': { 'onetag': 1.20, 'rise': 1.18, 'amx': 1.15 },
+      'firetv': { 'aniview': 1.25, 'sovrn': 1.08, 'pubmatic': 1.12 },
+      'androidtv': { 'appnexus': 1.18, 'rubicon': 1.15, 'onetag': 1.10 },
+      'lg': { 'pubmatic': 1.20, 'rise': 1.15, 'amx': 1.12 },
+      'appletv': { 'onetag': 1.25, 'appnexus': 1.20, 'aniview': 1.15 }
+    };
+    
+    const deviceType = ctvProvider.type || 'unknown';
+    if (devicePreferences[deviceType] && devicePreferences[deviceType][bidderName]) {
+      multiplier *= devicePreferences[deviceType][bidderName];
+    }
+    
+    // Content category preferences
+    if (contentContext.category === 'entertainment') {
+      const entertainmentBoost = {
+        'aniview': 1.15, 'pubmatic': 1.10, 'onetag': 1.12
+      };
+      if (entertainmentBoost[bidderName]) {
+        multiplier *= entertainmentBoost[bidderName];
+      }
+    }
+    
+    // Premium content boost
+    if (contentContext.isPremium) {
+      multiplier *= 1.20;
+    }
+    
+    // Time-based adjustments (primetime)
+    const hour = new Date().getHours();
+    if (hour >= 19 && hour <= 23) { // Primetime
+      multiplier *= 1.25;
+    }
+    
+    return multiplier;
+  }
+
+  // Generate bidder-specific VAST
+  generateBidderSpecificVAST(bidderName, params, cpm) {
+    const bidderBrands = {
+      'onetag': 'OneTag Media',
+      'pubmatic': 'PubMatic DSP',
+      'rise': 'Rise Advertising',
+      'appnexus': 'Xandr Monetize',
+      'rubicon': 'Magnite CTV',
+      'sovrn': 'Sovrn Video',
+      'amx': 'AMX RTB',
+      'aniview': 'Aniview Player'
+    };
+    
+    const brandName = bidderBrands[bidderName] || 'Demo Advertiser';
+    const adId = `${bidderName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.0">
+  <Ad id="${adId}">
+    <InLine>
+      <AdSystem>${brandName}</AdSystem>
+      <AdTitle>Premium CTV Campaign - ${brandName}</AdTitle>
+      <Impression><![CDATA[https://${bidderName}-ssp.com/impression?id=${adId}&cpm=${cpm.toFixed(2)}]]></Impression>
+      <Creatives>
+        <Creative>
+          <Linear>
+            <Duration>00:00:30</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://${bidderName}-ssp.com/tracking?event=start&id=${adId}]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://${bidderName}-ssp.com/tracking?event=q1&id=${adId}]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://${bidderName}-ssp.com/tracking?event=mid&id=${adId}]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://${bidderName}-ssp.com/tracking?event=q3&id=${adId}]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://${bidderName}-ssp.com/tracking?event=complete&id=${adId}]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://example-advertiser.com/landing?utm_source=${bidderName}]]></ClickThrough>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1920" height="1080">
+                <![CDATA[https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4]]>
+              </MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>`;
+  }
+
+  // Get bidder advertiser domains
+  getBidderAdvertiserDomains(bidderName) {
+    const domains = {
+      'onetag': ['nike.com', 'disney.com', 'coca-cola.com'],
+      'pubmatic': ['amazon.com', 'netflix.com', 'samsung.com'],
+      'rise': ['bmw.com', 'spotify.com', 'airbnb.com'],
+      'appnexus': ['microsoft.com', 'apple.com', 'adobe.com'],
+      'rubicon': ['pepsi.com', 'toyota.com', 'hp.com'],
+      'sovrn': ['booking.com', 'uber.com', 'paypal.com'],
+      'amx': ['intel.com', 'visa.com', 'mastercard.com'],
+      'aniview': ['warner.com', 'paramount.com', 'universal.com']
+    };
+    
+    const bidderDomains = domains[bidderName] || ['example-advertiser.com'];
+    return [bidderDomains[Math.floor(Math.random() * bidderDomains.length)]];
+  }
+
+  // Enhanced demo CPM calculation with bidder-aware adjustments
+  calculateAdvancedDemoCpm(winner, ctvProvider, contentContext) {
+    let cpm = winner.cpm;
+    
+    // Device premiums
+    if (ctvProvider.capabilities?.video?.hdr) {
+      cpm *= 1.15; // 15% HDR premium
+    }
+    
+    if (ctvProvider.capabilities?.video?.resolution?.includes('3840x2160')) {
+      cpm *= 1.25; // 25% 4K premium
+    }
+    
+    // Time of day adjustment
+    const hour = new Date().getHours();
+    if (hour >= 18 && hour <= 23) {
+      cpm *= 1.3; // 30% primetime premium
+    } else if (hour >= 6 && hour <= 9) {
+      cpm *= 1.1; // 10% morning boost
+    }
+    
+    // Platform-specific adjustments
+    const platformOverride = this.getPlatformOverride(ctvProvider);
+    if (platformOverride) {
+      cpm *= 1.05; // 5% platform integration bonus
+    }
+    
+    return cpm;
+  }
+
+  // Get platform override configuration
+  getPlatformOverride(ctvProvider) {
+    const platformMap = {
+      'samsung': 'samsung_tv_plus',
+      'lg': 'lg_channels', 
+      'roku': 'rakuten_tv',
+      'firetv': 'tcl_channel',
+      'tizen': 'samsung_tv_plus',
+      'webos': 'lg_channels'
+    };
+    
+    return platformMap[ctvProvider.type] || null;
+  }
+
+  // Generate fallback demo auction if everything fails
+  generateFallbackDemoAuction(auctionId) {
+    const fallbackVast = this.generateVpaidDemoVast();
+    return {
+      auctionId,
+      isDemoMode: true,
+      winner: {
+        id: `fallback_${Date.now()}`,
+        bidder: 'Demo Fallback',
+        price: 2.50,
+        adm: fallbackVast,
+        vastXml: fallbackVast,
+        crid: `fallback_creative_${Date.now()}`,
+        w: 1920,
+        h: 1080,
+        adomain: ['demo-advertiser.com'],
+        cat: ['IAB1']
+      },
+      clearingPrice: 2.50,
+      vastXml: fallbackVast,
+      participatingBidders: 1,
+      auctionTime: 100,
+      metadata: {
+        realBidders: [],
+        demoEndpoints: ['Fallback'],
+        platformOverride: null,
+        winnerType: 'fallback'
+      }
+    };
+  }
+
   // Fetch real VAST ads from demo endpoints
   async fetchDemoVastAds(adRequest, ctvProvider) {
     const demoAds = [];
@@ -743,68 +1042,6 @@ export class RealProgrammaticService {
     }
     
     return demoAds[0]; // Fallback
-  }
-  
-  // Calculate demo CPM with device/content adjustments
-  calculateDemoCpm(winner, ctvProvider) {
-    let cpm = winner.cpm;
-    
-    // Device premiums
-    if (ctvProvider.capabilities?.video?.hdr) {
-      cpm *= 1.15; // 15% HDR premium
-    }
-    
-    if (ctvProvider.capabilities?.video?.resolution?.includes('3840x2160')) {
-      cpm *= 1.25; // 25% 4K premium
-    }
-    
-    // Time of day adjustment
-    const hour = new Date().getHours();
-    if (hour >= 18 && hour <= 23) {
-      cpm *= 1.3; // 30% primetime premium
-    }
-    
-    return cpm;
-  }
-  
-  // Generate VPAID demo VAST
-  generateVpaidDemoVast() {
-    const requestId = this.generateRequestId();
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<VAST version="4.0">
-  <Ad id="vpaid_demo_${requestId}">
-    <InLine>
-      <AdSystem>VPAID Demo Exchange</AdSystem>
-      <AdTitle>Interactive CTV Demo Ad</AdTitle>
-      <Impression><![CDATA[https://demo-tracking.example.com/impression?id=${requestId}]]></Impression>
-      <Creatives>
-        <Creative>
-          <Linear>
-            <Duration>00:00:30</Duration>
-            <TrackingEvents>
-              <Tracking event="start"><![CDATA[https://demo-tracking.example.com/start?id=${requestId}]]></Tracking>
-              <Tracking event="complete"><![CDATA[https://demo-tracking.example.com/complete?id=${requestId}]]></Tracking>
-              <Tracking event="firstQuartile"><![CDATA[https://demo-tracking.example.com/q1?id=${requestId}]]></Tracking>
-              <Tracking event="midpoint"><![CDATA[https://demo-tracking.example.com/midpoint?id=${requestId}]]></Tracking>
-              <Tracking event="thirdQuartile"><![CDATA[https://demo-tracking.example.com/q3?id=${requestId}]]></Tracking>
-            </TrackingEvents>
-            <VideoClicks>
-              <ClickThrough><![CDATA[https://example-advertiser.com/ctv-landing]]></ClickThrough>
-            </VideoClicks>
-            <MediaFiles>
-              <MediaFile delivery="progressive" type="video/mp4" width="1920" height="1080">
-                <![CDATA[https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4]]>
-              </MediaFile>
-              <MediaFile delivery="progressive" type="application/javascript" apiFramework="VPAID" width="1920" height="1080">
-                <![CDATA[https://demo-vpaid.example.com/vpaid.js]]>
-              </MediaFile>
-            </MediaFiles>
-          </Linear>
-        </Creative>
-      </Creatives>
-    </InLine>
-  </Ad>
-</VAST>`;
   }
 }
 

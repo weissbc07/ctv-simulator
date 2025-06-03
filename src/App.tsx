@@ -2,15 +2,19 @@ import { useState, useCallback } from 'react';
 import VideoPlayer from './components/VideoPlayer';
 import ConfigPanel from './components/ConfigPanel';
 import AdXConfigPanel from './components/AdXConfigPanel';
+import DAIConfigPanel from './components/DAIConfigPanel';
+import DAIVideoPlayer from './components/DAIVideoPlayer';
 import LogPanel from './components/LogPanel';
 import { useStore } from './store/useStore';
-import { Tv, Activity, Shield, Settings } from 'lucide-react';
-import { AdXConfig } from './types';
+import { Tv, Activity, Shield, Settings, Video } from 'lucide-react';
+import { AdXConfig, DAIConfig, DAIStreamRequest } from './types';
 
 function App() {
   const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd } = useStore();
-  const [activeTab, setActiveTab] = useState<'config' | 'adx'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai'>('config');
   const [adxConfig, setAdxConfig] = useState<AdXConfig | null>(null);
+  const [daiConfig, setDaiConfig] = useState<DAIConfig | null>(null);
+  const [daiStreamUrl, setDaiStreamUrl] = useState<string | null>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -44,6 +48,37 @@ function App() {
     });
   }, [addLog]);
 
+  const handleDAIConfigChange = useCallback((config: DAIConfig) => {
+    setDaiConfig(config);
+    addLog({
+      level: 'info',
+      message: '🎬 DAI configuration updated',
+      details: {
+        enabled: config.enabled,
+        streamFormat: config.streamFormat,
+        contentSourceId: config.contentSourceId,
+        authKeysCount: config.authKeys.length
+      }
+    });
+  }, [addLog]);
+
+  const handleDAIStreamRequest = useCallback((request: DAIStreamRequest) => {
+    // For demo purposes, generate a mock stream URL
+    const mockStreamUrl = `http://localhost:8081/api/dai/stitch?streamUrl=${encodeURIComponent('https://demo-ctv-content.com/sample.m3u8')}&format=${request.format}`;
+    setDaiStreamUrl(mockStreamUrl);
+    
+    addLog({
+      level: 'success',
+      message: '🚀 DAI stream request initiated',
+      details: {
+        contentSourceId: request.contentSourceId,
+        videoId: request.videoId,
+        format: request.format,
+        streamUrl: mockStreamUrl
+      }
+    });
+  }, [addLog]);
+
   return (
     <div className="min-h-screen bg-ctv-dark text-white">
       {/* Header */}
@@ -55,7 +90,7 @@ function App() {
               <h1 className="text-2xl font-bold">CTV Simulator</h1>
             </div>
             <div className="text-sm text-gray-400">
-              UK Smart TV Ad Tech Testing & Debugging with Google AdX + PAL SDK
+              UK Smart TV Ad Tech Testing & Debugging with Google AdX + PAL SDK + DAI
             </div>
           </div>
           
@@ -80,7 +115,7 @@ function App() {
             </div>
             
             {/* AdX Status */}
-            {adxConfig && (
+            {adxConfig && activeTab !== 'dai' && (
               <div className="flex items-center gap-2 text-sm">
                 <Shield className={`w-4 h-4 ${adxConfig.enablePAL ? 'text-green-400' : 'text-yellow-400'}`} />
                 <span className="text-green-400">AdX Active</span>
@@ -89,10 +124,25 @@ function App() {
                 )}
               </div>
             )}
+
+            {/* DAI Status */}
+            {daiConfig && activeTab === 'dai' && (
+              <div className="flex items-center gap-2 text-sm">
+                <Video className={`w-4 h-4 ${daiConfig.enabled ? 'text-purple-400' : 'text-gray-400'}`} />
+                <span className={daiConfig.enabled ? 'text-purple-400' : 'text-gray-400'}>
+                  DAI {daiConfig.enabled ? 'Enabled' : 'Disabled'}
+                </span>
+                {daiConfig.enabled && daiConfig.authKeys.filter(k => k.status === 'active').length > 0 && (
+                  <span className="text-xs bg-purple-600 px-2 py-1 rounded">
+                    {daiConfig.authKeys.filter(k => k.status === 'active').length} Keys
+                  </span>
+                )}
+              </div>
+            )}
             
             {/* Version */}
             <div className="text-xs text-gray-500">
-              v1.0.0
+              v1.1.0 - DAI
             </div>
           </div>
         </div>
@@ -106,7 +156,7 @@ function App() {
           <div className="flex border-b border-gray-700">
             <button
               onClick={() => setActiveTab('config')}
-              className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'config'
                   ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700'
@@ -117,14 +167,25 @@ function App() {
             </button>
             <button
               onClick={() => setActiveTab('adx')}
-              className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'adx'
                   ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700'
               }`}
             >
               <Shield className="w-4 h-4" />
-              AdX + PAL
+              AdX
+            </button>
+            <button
+              onClick={() => setActiveTab('dai')}
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                activeTab === 'dai'
+                  ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              DAI
             </button>
           </div>
           
@@ -137,6 +198,12 @@ function App() {
                 onTestRequest={handleAdXTestRequest}
               />
             )}
+            {activeTab === 'dai' && (
+              <DAIConfigPanel
+                onConfigChange={handleDAIConfigChange}
+                onStreamRequest={handleDAIStreamRequest}
+              />
+            )}
           </div>
         </div>
         
@@ -144,23 +211,61 @@ function App() {
         <div className="flex-1 p-4">
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <Tv className="w-5 h-5 text-ctv-blue" />
-              <h2 className="text-lg font-semibold">CTV Player</h2>
-              {adxConfig && (
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <span>•</span>
-                  <span>AdX: {adxConfig.publisherId}</span>
-                  {adxConfig.enablePAL && (
-                    <>
+              {activeTab === 'dai' ? (
+                <>
+                  <Video className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-lg font-semibold">DAI Video Player</h2>
+                  {daiConfig && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
                       <span>•</span>
-                      <span className="text-green-400">PAL Enabled</span>
-                    </>
+                      <span>Format: {daiConfig.streamFormat?.toUpperCase()}</span>
+                      {daiConfig.contentSourceId && (
+                        <>
+                          <span>•</span>
+                          <span>Source: {daiConfig.contentSourceId}</span>
+                        </>
+                      )}
+                      {daiConfig.enabled && (
+                        <>
+                          <span>•</span>
+                          <span className="text-purple-400">DAI Active</span>
+                        </>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
+              ) : (
+                <>
+                  <Tv className="w-5 h-5 text-ctv-blue" />
+                  <h2 className="text-lg font-semibold">CTV Player</h2>
+                  {adxConfig && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <span>•</span>
+                      <span>AdX: {adxConfig.publisherId}</span>
+                      {adxConfig.enablePAL && (
+                        <>
+                          <span>•</span>
+                          <span className="text-green-400">PAL Enabled</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
+            
             <div className="flex-1 bg-black rounded-lg overflow-hidden">
-              <VideoPlayer activeTab={activeTab} adxConfig={adxConfig} />
+              {activeTab === 'dai' ? (
+                <DAIVideoPlayer
+                  streamUrl={daiStreamUrl || undefined}
+                  config={daiConfig || undefined}
+                  autoPlay={false}
+                  muted={true}
+                  className="h-full"
+                />
+              ) : (
+                <VideoPlayer activeTab={activeTab} adxConfig={adxConfig} />
+              )}
             </div>
           </div>
         </div>
