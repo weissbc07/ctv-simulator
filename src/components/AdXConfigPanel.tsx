@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Tv, Shield, Settings, Play, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { AdXConfig, PALConfig, CTVProvider, AdXRequest } from '../types';
 import { parseVastXml, fireTrackingPixel } from '../utils/vastParser';
 import { useStore } from '../store/useStore';
@@ -164,15 +163,6 @@ const AdXConfigPanel: React.FC<AdXConfigPanelProps> = ({ onConfigChange, onTestR
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const CTV_PROVIDER_ICONS = {
-    roku: '📺',
-    samsung: '📱',
-    lg: '🖥️',
-    firetv: '🔥',
-    androidtv: '🤖',
-    appletv: '🍎'
   };
 
   return (

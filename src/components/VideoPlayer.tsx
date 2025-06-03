@@ -4,7 +4,7 @@ import 'video.js/dist/video-js.css';
 import { useStore } from '../store/useStore';
 import { makeAdRequest } from '../utils/adRequests';
 import { makePrebidServerRequest } from '../utils/prebidServer';
-import { parseVastXml, fireTrackingPixel, formatDuration, VastCreative } from '../utils/vastParser';
+import { parseVastXml, fireTrackingPixel, formatDuration } from '../utils/vastParser';
 import { AdXConfig } from '../types';
 
 interface VideoPlayerProps {
