@@ -480,6 +480,7 @@ export interface AdXConfig {
   serviceAccountKey?: string;
   enablePAL: boolean;
   useRealGAM?: boolean;
+  useRealProgrammatic?: boolean;
   firstPartyData?: Record<string, any>;
   publisherDomain?: string;
   contentPageUrl?: string;

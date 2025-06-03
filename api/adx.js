@@ -856,33 +856,50 @@ class AdXService {
       // Select content context
       const contentContext = this.selectContentContext(adRequest);
       
-      // Configure credentials if provided
-      if (adxConfig.realExchangeCredentials) {
-        for (const [exchangeId, credentials] of Object.entries(adxConfig.realExchangeCredentials)) {
-          this.realProgrammaticService.addExchangeCredentials(exchangeId, credentials);
-        }
-      }
+      // Check if we should use demo mode
+      const hasRealCredentials = this.hasValidCredentials(adxConfig.realExchangeCredentials);
+      const useDemoMode = !hasRealCredentials || adxConfig.enableDemoMode;
       
-      // Set floor prices if configured
-      if (adxConfig.floorPrice) {
-        this.realProgrammaticService.setFloorPrice(
-          adRequest.adUnitCode, 
-          'USD', 
-          adxConfig.floorPrice
+      let auctionResult;
+      
+      if (useDemoMode) {
+        console.log('🎬 Using DEMO MODE - Fetching real VAST ads from demo endpoints');
+        auctionResult = await this.realProgrammaticService.runDemoMode(
+          adRequest,
+          ctvProvider,
+          contentContext
+        );
+      } else {
+        console.log('🔐 Using LIVE MODE - Real exchange credentials detected');
+        
+        // Configure credentials if provided
+        if (adxConfig.realExchangeCredentials) {
+          for (const [exchangeId, credentials] of Object.entries(adxConfig.realExchangeCredentials)) {
+            this.realProgrammaticService.addExchangeCredentials(exchangeId, credentials);
+          }
+        }
+        
+        // Set floor prices if configured
+        if (adxConfig.floorPrice) {
+          this.realProgrammaticService.setFloorPrice(
+            adRequest.adUnitCode, 
+            'USD', 
+            adxConfig.floorPrice
+          );
+        }
+        
+        // Run real programmatic auction
+        auctionResult = await this.realProgrammaticService.runRealProgrammaticAuction(
+          {
+            ...adRequest,
+            publisherId: adxConfig.publisherId,
+            pageUrl: adxConfig.contentPageUrl || 'https://example.com',
+            publisherName: adxConfig.publisherName || 'CTV Publisher'
+          },
+          ctvProvider,
+          contentContext
         );
       }
-      
-      // Run real programmatic auction
-      const realAuctionResult = await this.realProgrammaticService.runRealProgrammaticAuction(
-        {
-          ...adRequest,
-          publisherId: adxConfig.publisherId,
-          pageUrl: adxConfig.contentPageUrl || 'https://example.com',
-          publisherName: adxConfig.publisherName || 'CTV Publisher'
-        },
-        ctvProvider,
-        contentContext
-      );
       
       // Generate PAL data for the real ad
       const palService = new PALService();
@@ -890,12 +907,12 @@ class AdXService {
         ...adxConfig.palConfig,
         ctvProvider: ctvProvider.type,
         contentId: contentContext.id,
-        auctionId: realAuctionResult.auctionId
+        auctionId: auctionResult.auctionId
       });
       
       // Build response in expected format
       return this.buildRealProgrammaticResponse(
-        realAuctionResult,
+        auctionResult,
         adxConfig,
         palData,
         contentContext,
@@ -911,6 +928,26 @@ class AdXService {
     }
   }
 
+  // Check if valid credentials are provided
+  hasValidCredentials(credentials) {
+    if (!credentials) return false;
+    
+    for (const [exchangeId, creds] of Object.entries(credentials)) {
+      // Check for basic auth requirements
+      const hasGoogleAuth = creds.clientId && creds.clientId !== 'YOUR_GOOGLE_CLIENT_ID';
+      const hasAmazonAuth = creds.accessKeyId && creds.accessKeyId !== 'YOUR_AWS_ACCESS_KEY_ID';
+      const hasGenericAuth = creds.apiKey && creds.apiKey !== 'YOUR_API_KEY';
+      
+      if (hasGoogleAuth || hasAmazonAuth || hasGenericAuth) {
+        console.log(`✅ Valid credentials found for ${exchangeId}`);
+        return true;
+      }
+    }
+    
+    console.log('⚠️ No valid exchange credentials found, using demo mode');
+    return false;
+  }
+
   // Build response for real programmatic auction
   buildRealProgrammaticResponse(auctionResult, adxConfig, palData, contentContext, ctvProvider) {
     const requestId = this.generateRequestId();
@@ -921,22 +958,24 @@ class AdXService {
     }
 
     const winner = auctionResult.winner;
+    const isDemoMode = auctionResult.isDemoMode || false;
     
     // OpenRTB response format
     const openRtbResponse = {
       id: auctionResult.auctionId,
       seatbid: [{
         bid: [{
-          id: winner.id,
+          id: winner.id || winner.adId,
           impid: "1",
           price: auctionResult.clearingPrice,
-          adm: auctionResult.vastXml || winner.adm,
-          crid: winner.crid || winner.id,
+          adm: auctionResult.vastXml || winner.adm || winner.vastXml,
+          crid: winner.crid || winner.adId || winner.id,
           w: 1920,
           h: 1080,
           ext: {
-            exchange: winner.exchangeName,
-            bidder: winner.seatId || winner.exchangeId,
+            exchange: winner.exchangeName || winner.source,
+            bidder: winner.seatId || winner.exchangeId || winner.sourceId,
+            isDemoMode: isDemoMode,
             auctionData: {
               totalBidders: auctionResult.totalBidders,
               runnerUpPrice: auctionResult.runnerUpPrice,
@@ -944,11 +983,12 @@ class AdXService {
             }
           }
         }],
-        seat: winner.exchangeId
+        seat: winner.exchangeId || winner.sourceId
       }],
       cur: "USD",
       ext: {
         realProgrammatic: true,
+        isDemoMode: isDemoMode,
         auctionId: auctionResult.auctionId
       }
     };
@@ -962,16 +1002,18 @@ class AdXService {
         currency: "USD",
         width: 1920,
         height: 1080,
-        vastXml: auctionResult.vastXml || winner.adm,
-        creativeId: winner.crid || winner.id,
+        vastXml: auctionResult.vastXml || winner.vastXml,
+        creativeId: winner.crid || winner.adId || winner.id,
         netRevenue: true,
         ttl: 300,
         meta: {
           advertiserDomains: winner.adomain || [],
-          brandName: winner.exchangeName,
-          networkName: winner.exchangeName,
+          brandName: winner.exchangeName || winner.source,
+          networkName: winner.exchangeName || winner.source,
           mediaType: "video",
-          isRealProgrammatic: true
+          isRealProgrammatic: true,
+          isDemoMode: isDemoMode,
+          vastSource: isDemoMode ? 'Demo Exchange' : 'Live Exchange'
         },
         pal: {
           verified: palData.verified,
@@ -984,13 +1026,15 @@ class AdXService {
           totalBidders: auctionResult.totalBidders,
           clearingPrice: auctionResult.clearingPrice,
           runnerUpPrice: auctionResult.runnerUpPrice,
-          exchange: winner.exchangeName,
-          realTime: true
+          exchange: winner.exchangeName || winner.source,
+          realTime: true,
+          isDemoMode: isDemoMode
         }
       }],
-      source: "Real Programmatic Exchange",
+      source: isDemoMode ? "Real VAST Demo Exchanges" : "Live Programmatic Exchanges",
       adUnitPath: adxConfig.adUnitPath,
       isRealProgrammatic: true,
+      isDemoMode: isDemoMode,
       contentContext: {
         title: contentContext.title,
         category: contentContext.category,
@@ -1003,11 +1047,12 @@ class AdXService {
       }
     };
 
-    console.log(`🎯 Real Programmatic Response Generated:`);
+    console.log(`🎯 ${isDemoMode ? 'Demo' : 'Live'} Programmatic Response Generated:`);
     console.log(`   💰 CPM: $${auctionResult.clearingPrice.toFixed(2)}`);
-    console.log(`   🏆 Winner: ${winner.exchangeName}`);
+    console.log(`   🏆 Winner: ${winner.exchangeName || winner.source}`);
     console.log(`   📊 Bidders: ${auctionResult.totalBidders}`);
-    console.log(`   🎬 VAST: ${auctionResult.vastXml ? 'Retrieved' : 'Fallback'}`);
+    console.log(`   🎬 VAST: ${auctionResult.vastXml ? 'Real VAST Retrieved' : 'Fallback'}`);
+    console.log(`   🎪 Mode: ${isDemoMode ? 'DEMO (Real VAST from demo endpoints)' : 'LIVE (Real exchange credentials)'}`);
 
     return {
       ...openRtbResponse,

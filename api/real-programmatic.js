@@ -11,6 +11,7 @@ const REAL_AD_EXCHANGES = {
     endpoint: 'https://googleads.g.doubleclick.net/gampad/ads',
     rtbEndpoint: 'https://googleads.g.doubleclick.net/pagead/ads',
     vastEndpoint: 'https://pubads.g.doubleclick.net/gampad/ads',
+    demoEndpoint: 'https://pubads.g.doubleclick.net/gampad/ads?iu=/6062/iab_vast_samples&description_url=http%3A%2F%2Fiab.net&tfcd=0&npa=0&sz=640x480&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=',
     requiresAuth: true,
     supportedFormats: ['vast4', 'vast3', 'vast2'],
     maxBidTimeout: 1000,
@@ -19,6 +20,7 @@ const REAL_AD_EXCHANGES = {
   amazon_dsp: {
     name: 'Amazon DSP',
     endpoint: 'https://aax-us-east.amazon-adsystem.com/e/rtb/v2',
+    demoEndpoint: 'https://c.amazon-adsystem.com/aax2/getads.js',
     requiresAuth: true,
     supportedFormats: ['vast4', 'vast3'],
     maxBidTimeout: 800,
@@ -57,6 +59,16 @@ const REAL_AD_EXCHANGES = {
     requiresAuth: true,
     supportedFormats: ['vast4', 'vast3'],
     maxBidTimeout: 1000,
+    currency: 'USD'
+  },
+  spotx: {
+    name: 'SpotX (Magnite)',
+    endpoint: 'https://search.spotxchange.com/xml',
+    demoEndpoint: 'https://search.spotxchange.com/vast/2.00/85394',
+    demoChannelId: '85394',
+    requiresAuth: false,
+    supportedFormats: ['vast4', 'vast3'],
+    maxBidTimeout: 1200,
     currency: 'USD'
   }
 };
@@ -576,6 +588,215 @@ export class RealProgrammaticService {
             <MediaFiles>
               <MediaFile delivery="progressive" type="video/mp4" width="1920" height="1080">
                 <![CDATA[https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4]]>
+              </MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>`;
+  }
+
+  // NEW: Demo mode for testing with real VAST ads
+  async runDemoMode(adRequest, ctvProvider, contentContext) {
+    const auctionId = this.generateAuctionId();
+    const startTime = performance.now();
+    
+    console.log(`🎬 Running DEMO MODE with Real VAST Ads: ${auctionId}`);
+    console.log(`📱 Device: ${ctvProvider.name} (${ctvProvider.type})`);
+    
+    try {
+      // Fetch real VAST ads from demo endpoints
+      const demoAds = await this.fetchDemoVastAds(adRequest, ctvProvider);
+      
+      if (demoAds.length === 0) {
+        throw new Error('No demo ads available');
+      }
+      
+      // Simulate auction with real ads
+      const winner = this.selectDemoWinner(demoAds);
+      const clearingPrice = this.calculateDemoCpm(winner, ctvProvider);
+      
+      const endTime = performance.now();
+      console.log(`🏆 Demo Auction Complete: ${(endTime - startTime).toFixed(2)}ms`);
+      console.log(`💰 Demo Winner: ${winner.source} - $${clearingPrice.toFixed(2)} CPM`);
+      console.log(`🎬 Real VAST Retrieved: ${winner.vastXml ? 'Yes' : 'No'}`);
+      
+      return {
+        auctionId,
+        winner: {
+          ...winner,
+          exchangeName: winner.source,
+          exchangeId: winner.sourceId
+        },
+        clearingPrice,
+        totalBidders: demoAds.length,
+        runnerUpPrice: clearingPrice * 0.8,
+        vastXml: winner.vastXml,
+        timestamp: Date.now(),
+        isDemoMode: true
+      };
+      
+    } catch (error) {
+      console.error('❌ Demo Mode Error:', error);
+      throw error;
+    }
+  }
+  
+  // Fetch real VAST ads from demo endpoints
+  async fetchDemoVastAds(adRequest, ctvProvider) {
+    const demoAds = [];
+    
+    // 1. Google Ad Manager Demo VAST
+    try {
+      console.log('📤 Fetching Google demo VAST...');
+      const googleDemoUrl = `https://pubads.g.doubleclick.net/gampad/ads?iu=/6062/iab_vast_samples&description_url=http%3A%2F%2Fiab.net&tfcd=0&npa=0&sz=1920x1080&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=${Date.now()}`;
+      
+      const response = await fetch(googleDemoUrl, {
+        headers: {
+          'User-Agent': ctvProvider.userAgent,
+        },
+        timeout: 3000
+      });
+      
+      if (response.ok) {
+        const vastXml = await response.text();
+        if (vastXml.includes('<VAST')) {
+          demoAds.push({
+            source: 'Google Ad Manager Demo',
+            sourceId: 'google_demo',
+            vastXml: vastXml,
+            cpm: 2.5 + Math.random() * 3, // $2.50-$5.50
+            adId: `google_demo_${this.generateRequestId()}`
+          });
+          console.log('✅ Google demo VAST retrieved');
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ Google demo failed:', error.message);
+    }
+    
+    // 2. SpotX Demo VAST
+    try {
+      console.log('📤 Fetching SpotX demo VAST...');
+      const spotxDemoUrl = `https://search.spotxchange.com/vast/2.00/85394?cb=${Date.now()}&w=1920&h=1080`;
+      
+      const response = await fetch(spotxDemoUrl, {
+        headers: {
+          'User-Agent': ctvProvider.userAgent,
+        },
+        timeout: 3000
+      });
+      
+      if (response.ok) {
+        const vastXml = await response.text();
+        if (vastXml.includes('<VAST')) {
+          demoAds.push({
+            source: 'SpotX Demo',
+            sourceId: 'spotx_demo',
+            vastXml: vastXml,
+            cpm: 1.8 + Math.random() * 2.5, // $1.80-$4.30
+            adId: `spotx_demo_${this.generateRequestId()}`
+          });
+          console.log('✅ SpotX demo VAST retrieved');
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ SpotX demo failed:', error.message);
+    }
+    
+    // 3. VPAID Demo Ad
+    try {
+      console.log('📤 Adding VPAID demo ad...');
+      const vpaidVast = this.generateVpaidDemoVast();
+      demoAds.push({
+        source: 'VPAID Demo',
+        sourceId: 'vpaid_demo',
+        vastXml: vpaidVast,
+        cpm: 3.2 + Math.random() * 2, // $3.20-$5.20
+        adId: `vpaid_demo_${this.generateRequestId()}`
+      });
+      console.log('✅ VPAID demo VAST generated');
+    } catch (error) {
+      console.log('⚠️ VPAID demo failed:', error.message);
+    }
+    
+    console.log(`📊 Retrieved ${demoAds.length} demo ads for auction`);
+    return demoAds;
+  }
+  
+  // Select winner from demo ads
+  selectDemoWinner(demoAds) {
+    if (demoAds.length === 0) return null;
+    
+    // Weight selection by CPM (higher CPM more likely to win)
+    const totalWeight = demoAds.reduce((sum, ad) => sum + ad.cpm, 0);
+    const random = Math.random() * totalWeight;
+    
+    let currentWeight = 0;
+    for (const ad of demoAds) {
+      currentWeight += ad.cpm;
+      if (random <= currentWeight) {
+        return ad;
+      }
+    }
+    
+    return demoAds[0]; // Fallback
+  }
+  
+  // Calculate demo CPM with device/content adjustments
+  calculateDemoCpm(winner, ctvProvider) {
+    let cpm = winner.cpm;
+    
+    // Device premiums
+    if (ctvProvider.capabilities?.video?.hdr) {
+      cpm *= 1.15; // 15% HDR premium
+    }
+    
+    if (ctvProvider.capabilities?.video?.resolution?.includes('3840x2160')) {
+      cpm *= 1.25; // 25% 4K premium
+    }
+    
+    // Time of day adjustment
+    const hour = new Date().getHours();
+    if (hour >= 18 && hour <= 23) {
+      cpm *= 1.3; // 30% primetime premium
+    }
+    
+    return cpm;
+  }
+  
+  // Generate VPAID demo VAST
+  generateVpaidDemoVast() {
+    const requestId = this.generateRequestId();
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.0">
+  <Ad id="vpaid_demo_${requestId}">
+    <InLine>
+      <AdSystem>VPAID Demo Exchange</AdSystem>
+      <AdTitle>Interactive CTV Demo Ad</AdTitle>
+      <Impression><![CDATA[https://demo-tracking.example.com/impression?id=${requestId}]]></Impression>
+      <Creatives>
+        <Creative>
+          <Linear>
+            <Duration>00:00:30</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://demo-tracking.example.com/start?id=${requestId}]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://demo-tracking.example.com/complete?id=${requestId}]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://demo-tracking.example.com/q1?id=${requestId}]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://demo-tracking.example.com/midpoint?id=${requestId}]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://demo-tracking.example.com/q3?id=${requestId}]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://example-advertiser.com/ctv-landing]]></ClickThrough>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1920" height="1080">
+                <![CDATA[https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4]]>
+              </MediaFile>
+              <MediaFile delivery="progressive" type="application/javascript" apiFramework="VPAID" width="1920" height="1080">
+                <![CDATA[https://demo-vpaid.example.com/vpaid.js]]>
               </MediaFile>
             </MediaFiles>
           </Linear>

@@ -10,36 +10,44 @@ export const REAL_PROGRAMMATIC_CONFIG = {
     enableFloorPrices: true,
     enablePMPDeals: true,
     enableHeaderBidding: true,
-    defaultFloorPrice: 0.50 // $0.50 CPM minimum
+    defaultFloorPrice: 0.50, // $0.50 CPM minimum
+    // NEW: Test mode for getting started
+    enableTestMode: true, // Set to false when you have real credentials
+    fallbackToDemo: true  // Falls back to demo ads if no real credentials
   },
 
   // Real Ad Exchange Credentials (REPLACE WITH YOUR ACTUAL CREDENTIALS)
   exchangeCredentials: {
     google_adx: {
       // Google Ad Exchange / Google Ad Manager
-      clientId: 'YOUR_GOOGLE_CLIENT_ID',
-      clientSecret: 'YOUR_GOOGLE_CLIENT_SECRET',
-      refreshToken: 'YOUR_GOOGLE_REFRESH_TOKEN',
-      accessToken: 'YOUR_GOOGLE_ACCESS_TOKEN', // Will be refreshed automatically
-      networkCode: 'YOUR_NETWORK_CODE', // e.g., '22106938864'
-      publisherId: 'YOUR_PUBLISHER_ID',
+      // STEP 1: Get these from https://admanager.google.com/
+      clientId: process.env.GOOGLE_ADX_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
+      clientSecret: process.env.GOOGLE_ADX_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET',
+      refreshToken: process.env.GOOGLE_ADX_REFRESH_TOKEN || 'YOUR_GOOGLE_REFRESH_TOKEN',
+      accessToken: process.env.GOOGLE_ADX_ACCESS_TOKEN || 'YOUR_GOOGLE_ACCESS_TOKEN',
+      networkCode: process.env.GOOGLE_ADX_NETWORK_CODE || '22106938864', // Your GAM network code
+      publisherId: process.env.GOOGLE_ADX_PUBLISHER_ID || 'YOUR_PUBLISHER_ID',
       
       // GAM-specific settings
-      adUnitPath: '/YOUR_NETWORK_CODE/your-ctv-ad-unit',
+      adUnitPath: '/22106938864,22966701315/failarmy-auth-ctv-android',
       sizes: [[1920, 1080], [1280, 720]],
       targeting: {
         device_category: ['ctv', 'connected_tv'],
         content_genre: ['entertainment', 'sports', 'news']
-      }
+      },
+      // NEW: Simple demo integration for testing
+      demoMode: true, // Uses Google's demo ad units for testing
+      demoNetworkCode: '22106938864'
     },
 
     amazon_dsp: {
       // Amazon DSP / Amazon Publisher Services
-      accessKeyId: 'YOUR_AWS_ACCESS_KEY_ID',
-      secretAccessKey: 'YOUR_AWS_SECRET_ACCESS_KEY',
+      // STEP 2: Get these from https://aps.amazon.com/
+      accessKeyId: process.env.AMAZON_DSP_ACCESS_KEY || 'YOUR_AWS_ACCESS_KEY_ID',
+      secretAccessKey: process.env.AMAZON_DSP_SECRET_KEY || 'YOUR_AWS_SECRET_ACCESS_KEY',
       region: 'us-east-1',
-      publisherId: 'YOUR_AMAZON_PUBLISHER_ID',
-      siteId: 'YOUR_AMAZON_SITE_ID',
+      publisherId: process.env.AMAZON_PUBLISHER_ID || 'YOUR_AMAZON_PUBLISHER_ID',
+      siteId: process.env.AMAZON_SITE_ID || 'YOUR_AMAZON_SITE_ID',
       
       // Amazon-specific settings
       bidFloor: 0.75,
@@ -47,7 +55,24 @@ export const REAL_PROGRAMMATIC_CONFIG = {
       targeting: {
         device_type: 'ctv',
         video_placement: 'preroll'
-      }
+      },
+      // NEW: Test with Amazon's demo endpoints
+      demoMode: true,
+      testEndpoint: 'https://c.amazon-adsystem.com/aax2/getads.js'
+    },
+
+    // NEW: Add SpotX (now Magnite) as they have easier onboarding
+    spotx: {
+      // SpotX/Magnite - Good for getting started with CTV
+      channelId: process.env.SPOTX_CHANNEL_ID || 'YOUR_SPOTX_CHANNEL_ID',
+      publisherId: process.env.SPOTX_PUBLISHER_ID || 'YOUR_SPOTX_PUBLISHER_ID',
+      apiKey: process.env.SPOTX_API_KEY || 'YOUR_SPOTX_API_KEY',
+      
+      // SpotX settings
+      bidFloor: 0.50,
+      categories: ['video', 'entertainment'],
+      demoMode: true, // Uses SpotX test campaigns
+      testChannelId: '85394' // SpotX demo channel
     },
 
     trade_desk: {

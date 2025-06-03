@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AdXConfig, PALConfig, CTVProvider, AdXRequest } from '../types';
 import { parseVastXml, fireTrackingPixel } from '../utils/vastParser';
 import { useStore } from '../store/useStore';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface AdXConfigPanelProps {
   onConfigChange: (config: AdXConfig) => void;
@@ -15,7 +16,7 @@ const AdXConfigPanel: React.FC<AdXConfigPanelProps> = ({ onConfigChange, onTestR
     adUnitPath: '/22106938864,22966701315/failarmy-auth-ctv-android',
     networkCode: '22106938864',
     enablePAL: true,
-    useRealGAM: true,
+    useRealProgrammatic: true,
     contentPageUrl: 'https://failarmy.com',
     videoPosition: 'preroll',
     omidPartnerName: 'FailArmy',
@@ -255,11 +256,11 @@ const AdXConfigPanel: React.FC<AdXConfigPanelProps> = ({ onConfigChange, onTestR
             <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={adxConfig.useRealGAM}
-                onChange={(e) => handleAdXConfigChange('useRealGAM', e.target.checked)}
+                checked={adxConfig.useRealProgrammatic}
+                onChange={(e) => handleAdXConfigChange('useRealProgrammatic', e.target.checked)}
                 className="mr-2"
               />
-              <span className="text-sm font-medium text-gray-700">Enhanced Targeting</span>
+              <span className="text-sm font-medium text-gray-700">Use Real Programmatic</span>
             </label>
           </div>
         </div>
@@ -408,6 +409,37 @@ const AdXConfigPanel: React.FC<AdXConfigPanelProps> = ({ onConfigChange, onTestR
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Demo Mode Indicator */}
+        {adxConfig.useRealProgrammatic && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+            <div className="flex items-center">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+              <div>
+                <h4 className="text-sm font-medium text-yellow-800">🎬 Demo Mode Active</h4>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Using real VAST ads from demo endpoints (Google Ad Manager, SpotX). 
+                  Configure exchange credentials above to enable live programmatic auctions.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!adxConfig.useRealProgrammatic && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
+              <div>
+                <h4 className="text-sm font-medium text-blue-800">🎭 Mock Mode Active</h4>
+                <p className="text-xs text-blue-700 mt-1">
+                  Using sophisticated mock programmatic auctions. 
+                  Enable "Use Real Programmatic" above to see actual VAST ads.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
