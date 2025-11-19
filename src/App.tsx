@@ -3,15 +3,16 @@ import VideoPlayer from './components/VideoPlayer';
 import ConfigPanel from './components/ConfigPanel';
 import AdXConfigPanel from './components/AdXConfigPanel';
 import DAIConfigPanel from './components/DAIConfigPanel';
+import AdPodOptimizerConfigPanel from './components/AdPodOptimizerConfigPanel';
 import DAIVideoPlayer from './components/DAIVideoPlayer';
 import LogPanel from './components/LogPanel';
 import { useStore } from './store/useStore';
-import { Tv, Activity, Shield, Settings, Video } from 'lucide-react';
+import { Tv, Activity, Shield, Settings, Video, Zap } from 'lucide-react';
 import { AdXConfig, DAIConfig, DAIStreamRequest } from './types';
 
 function App() {
-  const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd } = useStore();
-  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai'>('config');
+  const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd, optimizerEnabled } = useStore();
+  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai' | 'optimizer'>('config');
   const [adxConfig, setAdxConfig] = useState<AdXConfig | null>(null);
   const [daiConfig, setDaiConfig] = useState<DAIConfig | null>(null);
   const [daiStreamUrl, setDaiStreamUrl] = useState<string | null>(null);
@@ -114,6 +115,15 @@ function App() {
               )}
             </div>
             
+            {/* Optimizer Status */}
+            {optimizerEnabled && activeTab === 'config' && (
+              <div className="flex items-center gap-2 text-sm">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <span className="text-yellow-400">AI Optimizer Active</span>
+                <span className="text-xs bg-yellow-600 px-2 py-1 rounded">AI</span>
+              </div>
+            )}
+
             {/* AdX Status */}
             {adxConfig && activeTab !== 'dai' && (
               <div className="flex items-center gap-2 text-sm">
@@ -166,6 +176,17 @@ function App() {
               Config
             </button>
             <button
+              onClick={() => setActiveTab('optimizer')}
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                activeTab === 'optimizer'
+                  ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              AI Pod
+            </button>
+            <button
               onClick={() => setActiveTab('adx')}
               className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'adx'
@@ -192,6 +213,7 @@ function App() {
           {/* Tab Content */}
           <div className="flex-1 p-4 overflow-y-auto">
             {activeTab === 'config' && <ConfigPanel />}
+            {activeTab === 'optimizer' && <AdPodOptimizerConfigPanel />}
             {activeTab === 'adx' && (
               <AdXConfigPanel
                 onConfigChange={handleAdXConfigChange}
