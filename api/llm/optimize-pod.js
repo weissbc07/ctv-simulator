@@ -5,7 +5,7 @@
  * based on contextual information, historical performance, and demand source data.
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Main handler for ad pod optimization
