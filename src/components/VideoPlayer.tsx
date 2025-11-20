@@ -7,10 +7,82 @@ import { makePrebidServerRequest } from '../utils/prebidServer';
 import { parseVastXml, fireTrackingPixel, formatDuration } from '../utils/vastParser';
 import { AdXConfig } from '../types';
 import { getOptimizer, AdOpportunity } from '../utils/dynamicAdPodOptimizer';
+import { getCreativeQualityTracker } from '../utils/creativeQualityTracker';
 
 interface VideoPlayerProps {
   activeTab?: 'config' | 'adx';
   adxConfig?: AdXConfig | null;
+}
+
+/**
+ * Detect device type from user agent
+ */
+function detectDeviceType(): 'desktop' | 'mobile' | 'tablet' | 'ctv' {
+  if (typeof navigator === 'undefined') return 'desktop';
+
+  const ua = navigator.userAgent.toLowerCase();
+  const width = typeof window !== 'undefined' ? window.innerWidth : 1920;
+
+  // Check for CTV/Smart TV
+  if (
+    ua.includes('tv') ||
+    ua.includes('smarttv') ||
+    ua.includes('googletv') ||
+    ua.includes('appletv') ||
+    ua.includes('roku') ||
+    ua.includes('firetv')
+  ) {
+    return 'ctv';
+  }
+
+  // Check for tablet
+  if (
+    (ua.includes('ipad') || (ua.includes('android') && !ua.includes('mobile'))) ||
+    (width >= 768 && width <= 1024)
+  ) {
+    return 'tablet';
+  }
+
+  // Check for mobile
+  if (
+    ua.includes('mobile') ||
+    ua.includes('iphone') ||
+    ua.includes('android') ||
+    width < 768
+  ) {
+    return 'mobile';
+  }
+
+  return 'desktop';
+}
+
+/**
+ * Detect connection speed (rough estimate)
+ */
+function detectConnectionSpeed(): 'slow' | 'medium' | 'fast' {
+  // Use Network Information API if available
+  if (typeof navigator !== 'undefined' && 'connection' in navigator) {
+    const connection = (navigator as any).connection;
+    if (connection) {
+      const effectiveType = connection.effectiveType;
+      if (effectiveType === '4g') return 'fast';
+      if (effectiveType === '3g') return 'medium';
+      return 'slow';
+    }
+  }
+
+  // Default to medium if API not available
+  return 'medium';
+}
+
+/**
+ * Get location (country code) - simplified version
+ * In production, use geo-IP lookup or user data
+ */
+function getLocation(): string {
+  // Default to US for now
+  // In production: use geo-IP API or server-side detection
+  return 'US';
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConfig = null }) => {
@@ -66,13 +138,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
         // Set up event listeners
         player.on('play', () => {
           setIsPlaying(true);
-          
+
           if (isPlayingAd && currentAd) {
             addLog({
               level: 'info',
               message: `🎬 Ad started playing: ${currentAd.title}`
             });
-            
+
+            // Track impression in quality tracker
+            const tracker = getCreativeQualityTracker();
+            const creativeId = (currentAd as any).creativeId || 'unknown';
+            const ssp = (currentAd as any).ssp || 'unknown';
+
+            tracker.trackImpression(creativeId, ssp, {
+              creativeId,
+              deviceType: detectDeviceType(),
+              location: getLocation(),
+              connectionSpeed: detectConnectionSpeed(),
+              playerType: 'instream',
+              ssp
+            });
+
             // Fire start tracking
             currentAd.trackingEvents.start.forEach(url => {
               fireTrackingPixel(url, 'start');
@@ -82,7 +168,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
               level: 'info',
               message: 'Video playback started'
             });
-            
+
             // Trigger pre-roll ad request for content
             handleAdRequest('pre-roll');
           }
@@ -157,18 +243,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
         
         player.on('ended', () => {
           setIsPlaying(false);
-          
+
           if (isPlayingAd && currentAd) {
             // Fire completion tracking
             currentAd.trackingEvents.complete.forEach(url => {
               fireTrackingPixel(url, 'complete');
             });
-            
+
             addLog({
               level: 'success',
               message: `🎬 Ad completed: ${currentAd.title}`
             });
-            
+
             // Return to content after ad
             restoreContentVideo();
           } else {
@@ -176,6 +262,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
               level: 'info',
               message: 'Video playback ended'
             });
+          }
+        });
+
+        // Track ad errors
+        player.on('error', () => {
+          if (isPlayingAd && currentAd) {
+            const error = player.error();
+            const errorMessage = error ? `${error.code}: ${error.message}` : 'Unknown error';
+
+            addLog({
+              level: 'error',
+              message: `🚨 Ad playback error: ${errorMessage}`
+            });
+
+            // Track error in quality tracker
+            const tracker = getCreativeQualityTracker();
+            const creativeId = (currentAd as any).creativeId || 'unknown';
+            const ssp = (currentAd as any).ssp || 'unknown';
+
+            tracker.trackError(
+              creativeId,
+              ssp,
+              {
+                creativeId,
+                deviceType: detectDeviceType(),
+                location: getLocation(),
+                connectionSpeed: detectConnectionSpeed(),
+                playerType: 'instream',
+                ssp
+              },
+              error ? `MEDIA_ERR_${error.code}` : 'UNKNOWN_ERROR',
+              errorMessage
+            );
+
+            // Return to content after error
+            restoreContentVideo();
           }
         });
       });
@@ -240,13 +362,123 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
 
     // Restore original content
     player.src(originalSourceRef.current);
-    
+
     // Auto-play content after ad
     player.ready(() => {
       player.play().catch((error: any) => {
         console.log('Content autoplay blocked:', error);
       });
     });
+  };
+
+  /**
+   * Unwrap VAST and validate creative quality before serving
+   * Returns null if creative should not be served
+   */
+  const unwrapAndValidateVAST = async (
+    vastUrl: string,
+    creativeId: string | undefined,
+    ssp: string
+  ): Promise<{ vastXml: string; creativeId: string } | null> => {
+    try {
+      addLog({
+        level: 'info',
+        message: `🔍 Server-side VAST unwrapping: ${creativeId || 'unknown'} from ${ssp}`
+      });
+
+      // Get creative context
+      const context = {
+        creativeId: creativeId || 'unknown',
+        deviceType: detectDeviceType(),
+        location: getLocation(),
+        connectionSpeed: detectConnectionSpeed(),
+        playerType: 'instream' as const,
+        ssp
+      };
+
+      // Check if creative is already blocked
+      const tracker = getCreativeQualityTracker();
+      if (creativeId && tracker.isCreativeBlocked(creativeId, ssp)) {
+        addLog({
+          level: 'warning',
+          message: `🚫 Creative ${creativeId} from ${ssp} is BLOCKED due to high error rate`
+        });
+        return null;
+      }
+
+      // Call server-side unwrap API
+      const response = await fetch('/api/vast/unwrap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vastUrl,
+          creativeId,
+          ssp,
+          context
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Unwrap API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success || !data.result) {
+        throw new Error('Invalid unwrap response');
+      }
+
+      const result = data.result;
+
+      // Check quality score
+      if (result.qualityScore < 50) {
+        addLog({
+          level: 'warning',
+          message: `⚠️ Low quality creative (score: ${result.qualityScore}/100)`,
+          details: {
+            issues: result.qualityIssues,
+            creativeId: result.creativeId
+          }
+        });
+      }
+
+      // Check if creative should be served
+      if (!result.shouldServe) {
+        addLog({
+          level: 'error',
+          message: `🚫 Creative REJECTED: ${result.blockReason}`,
+          details: {
+            creativeId: result.creativeId,
+            qualityScore: result.qualityScore,
+            issues: result.qualityIssues
+          }
+        });
+        return null;
+      }
+
+      addLog({
+        level: 'success',
+        message: `✅ VAST unwrapped successfully (chain depth: ${result.chain.length}, quality: ${result.qualityScore}/100)`,
+        details: {
+          creativeId: result.creativeId,
+          duration: result.duration,
+          trackingPixels: result.trackingPixels.length
+        }
+      });
+
+      // Return the final VAST XML and creative ID
+      return {
+        vastXml: result.finalVAST?.vastXml || '',
+        creativeId: result.creativeId || creativeId || 'unknown'
+      };
+    } catch (error) {
+      addLog({
+        level: 'error',
+        message: `VAST unwrap error: ${error}`,
+        details: { error: String(error) }
+      });
+      return null;
+    }
   };
 
   const handleOptimizedAdRequest = async (adType: string) => {
@@ -312,11 +544,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
         const firstBid = result.winningBids[0];
 
         try {
-          const vastXml = await fetch(firstBid.vastUrl).then(r => r.text());
-          const vastResponse = parseVastXml(vastXml);
+          // Unwrap and validate VAST before serving
+          const unwrapResult = await unwrapAndValidateVAST(
+            firstBid.vastUrl,
+            firstBid.creativeId,
+            firstBid.source
+          );
+
+          if (!unwrapResult) {
+            addLog({
+              level: 'warning',
+              message: `Creative rejected by quality check, skipping ad`
+            });
+            return;
+          }
+
+          const vastResponse = parseVastXml(unwrapResult.vastXml);
 
           if (vastResponse && vastResponse.ads.length > 0) {
             const adCreative = vastResponse.ads[0];
+
+            // Attach metadata for tracking
+            (adCreative as any).creativeId = unwrapResult.creativeId;
+            (adCreative as any).ssp = firstBid.source;
+
             setCurrentAd(adCreative);
 
             addLog({
@@ -325,7 +576,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
               details: {
                 source: firstBid.source,
                 cpm: firstBid.cpm,
-                slot: firstBid.slot
+                slot: firstBid.slot,
+                creativeId: unwrapResult.creativeId
               }
             });
           }
@@ -462,17 +714,60 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
 
         if (response.ok) {
           const adxResponse = await response.json();
-          
+
           if (adxResponse.ads && adxResponse.ads.length > 0) {
             const ad = adxResponse.ads[0];
-            const vastXml = ad.vastXml;
-            
-            if (vastXml) {
-              const vastResponse = parseVastXml(vastXml);
+            const vastUrl = ad.vastUrl;
+
+            if (vastUrl) {
+              // Unwrap and validate VAST before serving
+              const unwrapResult = await unwrapAndValidateVAST(
+                vastUrl,
+                ad.creativeId || ad.adId,
+                'Google AdX'
+              );
+
+              if (!unwrapResult) {
+                addLog({
+                  level: 'warning',
+                  message: `AdX creative rejected by quality check, skipping ad`
+                });
+                return;
+              }
+
+              const vastResponse = parseVastXml(unwrapResult.vastXml);
               if (vastResponse && vastResponse.ads.length > 0) {
                 const adCreative = vastResponse.ads[0];
+
+                // Attach metadata for tracking
+                (adCreative as any).creativeId = unwrapResult.creativeId;
+                (adCreative as any).ssp = 'Google AdX';
+
                 setCurrentAd(adCreative);
-                
+
+                addLog({
+                  level: 'success',
+                  message: `🎬 AdX ${adType} ad loaded: ${adCreative.title}`,
+                  details: {
+                    cpm: ad.cpm,
+                    currency: ad.currency,
+                    brand: ad.meta?.brandName,
+                    creativeId: unwrapResult.creativeId
+                  }
+                });
+              }
+            } else if (ad.vastXml) {
+              // Fallback: if vastXml is directly provided instead of URL
+              const vastResponse = parseVastXml(ad.vastXml);
+              if (vastResponse && vastResponse.ads.length > 0) {
+                const adCreative = vastResponse.ads[0];
+
+                // Attach metadata for tracking
+                (adCreative as any).creativeId = ad.creativeId || ad.adId || 'unknown';
+                (adCreative as any).ssp = 'Google AdX';
+
+                setCurrentAd(adCreative);
+
                 addLog({
                   level: 'success',
                   message: `🎬 AdX ${adType} ad loaded: ${adCreative.title}`,

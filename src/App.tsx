@@ -4,15 +4,16 @@ import ConfigPanel from './components/ConfigPanel';
 import AdXConfigPanel from './components/AdXConfigPanel';
 import DAIConfigPanel from './components/DAIConfigPanel';
 import AdPodOptimizerConfigPanel from './components/AdPodOptimizerConfigPanel';
+import CreativeQualityDashboard from './components/CreativeQualityDashboard';
 import DAIVideoPlayer from './components/DAIVideoPlayer';
 import LogPanel from './components/LogPanel';
 import { useStore } from './store/useStore';
-import { Tv, Activity, Shield, Settings, Video, Zap } from 'lucide-react';
+import { Tv, Activity, Shield, Settings, Video, Zap, AlertCircle } from 'lucide-react';
 import { AdXConfig, DAIConfig, DAIStreamRequest } from './types';
 
 function App() {
   const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd, optimizerEnabled } = useStore();
-  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai' | 'optimizer'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai' | 'optimizer' | 'quality'>('config');
   const [adxConfig, setAdxConfig] = useState<AdXConfig | null>(null);
   const [daiConfig, setDaiConfig] = useState<DAIConfig | null>(null);
   const [daiStreamUrl, setDaiStreamUrl] = useState<string | null>(null);
@@ -208,6 +209,17 @@ function App() {
               <Video className="w-4 h-4" />
               DAI
             </button>
+            <button
+              onClick={() => setActiveTab('quality')}
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                activeTab === 'quality'
+                  ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <AlertCircle className="w-4 h-4" />
+              Quality
+            </button>
           </div>
           
           {/* Tab Content */}
@@ -226,6 +238,7 @@ function App() {
                 onStreamRequest={handleDAIStreamRequest}
               />
             )}
+            {activeTab === 'quality' && <CreativeQualityDashboard />}
           </div>
         </div>
         
