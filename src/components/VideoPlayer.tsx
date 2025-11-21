@@ -6,6 +6,7 @@ import { makeAdRequest } from '../utils/adRequests';
 import { makePrebidServerRequest } from '../utils/prebidServer';
 import { parseVastXml, fireTrackingPixel, formatDuration } from '../utils/vastParser';
 import { AdXConfig } from '../types';
+import { getOptimizer, AdOpportunity } from '../utils/dynamicAdPodOptimizer';
 
 interface VideoPlayerProps {
   activeTab?: 'config' | 'adx';
@@ -27,7 +28,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
     currentAd,
     setCurrentAd,
     isPlayingAd,
-    setIsPlayingAd
+    setIsPlayingAd,
+    optimizerEnabled,
+    setCurrentPodStrategy,
+    addPodResult,
+    revenueTargets
   } = useStore();
 
   useEffect(() => {
@@ -244,6 +249,154 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
     });
   };
 
+  const handleOptimizedAdRequest = async (adType: string) => {
+    addLog({
+      level: 'info',
+      message: `🤖 AI Pod Optimizer: Building optimal ${adType} strategy...`
+    });
+
+    // Build ad opportunity context
+    const position = adType === 'pre-roll' ? 'preroll' :
+                    adType === 'mid-roll' ? 'midroll' : 'postroll';
+
+    const opportunity: AdOpportunity = {
+      position,
+      videoLength: playerRef.current?.duration() || 300,
+      maxAdDuration: position === 'midroll' ? 60 : 30,
+      category: 'entertainment',
+      device: ctvConfig.deviceType === 3 ? 'ctv' : 'desktop',
+      user: {
+        id: 'user-' + Math.random().toString(36).substr(2, 9),
+        segments: [],
+        ltv: 2.50
+      }
+    };
+
+    const optimizer = getOptimizer({
+      revenueTargets,
+      llmEndpoint: '/api/llm/optimize-pod',
+      enabled: true
+    });
+
+    try {
+      // Build optimal pod strategy
+      const strategy = await optimizer.buildOptimalAdPod(opportunity);
+      setCurrentPodStrategy(strategy);
+
+      addLog({
+        level: 'success',
+        message: `🎯 Strategy generated: ${strategy.slotCount} slot(s), expected revenue $${strategy.expectedRevenue.toFixed(3)}`,
+        details: {
+          slots: strategy.slotCount,
+          durations: strategy.durations,
+          expectedRevenue: strategy.expectedRevenue,
+          reasoning: strategy.reasoning
+        }
+      });
+
+      // Execute the optimized ad pod
+      const result = await optimizer.executeAdPod(strategy, opportunity);
+      addPodResult(result);
+
+      addLog({
+        level: 'success',
+        message: `📊 Pod completed: ${result.slotsFilled}/${result.slotsAttempted} slots filled, revenue $${result.totalRevenue.toFixed(3)}`,
+        details: {
+          winningBids: result.winningBids,
+          failedSlots: result.failedSlots
+        }
+      });
+
+      // Play the first winning ad if available
+      if (result.winningBids.length > 0) {
+        const firstBid = result.winningBids[0];
+
+        try {
+          const vastXml = await fetch(firstBid.vastUrl).then(r => r.text());
+          const vastResponse = parseVastXml(vastXml);
+
+          if (vastResponse && vastResponse.ads.length > 0) {
+            const adCreative = vastResponse.ads[0];
+            setCurrentAd(adCreative);
+
+            addLog({
+              level: 'success',
+              message: `🎬 Playing optimized ${adType}: ${adCreative.title}`,
+              details: {
+                source: firstBid.source,
+                cpm: firstBid.cpm,
+                slot: firstBid.slot
+              }
+            });
+          }
+        } catch (error) {
+          addLog({
+            level: 'error',
+            message: `Failed to load VAST creative: ${error}`
+          });
+        }
+      } else {
+        addLog({
+          level: 'warning',
+          message: `No ads filled for ${adType} - continuing with content`
+        });
+      }
+    } catch (error) {
+      addLog({
+        level: 'error',
+        message: `Optimizer error: ${error}`,
+        details: { error: String(error) }
+      });
+
+      // Fallback to traditional ad request
+      await handleTraditionalAdRequest(adType);
+    }
+  };
+
+  const handleTraditionalAdRequest = async (adType: string) => {
+    // Traditional ad request logic (existing code)
+    const endpoint = ctvConfig.vastTag || ctvConfig.openRtbEndpoint;
+
+    if (!endpoint) {
+      addLog({
+        level: 'warning',
+        message: `${adType} ad request skipped - no endpoint configured`
+      });
+      return;
+    }
+
+    addLog({
+      level: 'info',
+      message: `Triggering ${adType} ad request to ${endpoint}`
+    });
+
+    try {
+      const requestType = ctvConfig.vastTag ? 'vast' : 'openrtb';
+      const adRequest = await makeAdRequest(ctvConfig, endpoint, requestType);
+
+      addAdRequest(adRequest);
+
+      if (adRequest.status === 'success') {
+        addLog({
+          level: 'success',
+          message: `${adType} ad request successful (${adRequest.responseTime}ms)`,
+          adRequestId: adRequest.id
+        });
+      } else {
+        addLog({
+          level: 'error',
+          message: `${adType} ad request failed: ${adRequest.error}`,
+          adRequestId: adRequest.id
+        });
+      }
+    } catch (error) {
+      addLog({
+        level: 'error',
+        message: `${adType} ad request error: ${error}`
+      });
+    }
+  };
+
   const handleAdRequest = async (adType: string) => {
     // Skip ad requests if we're already playing an ad
     if (isPlayingAd) {
@@ -251,6 +404,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ activeTab = 'config', adxConf
         level: 'info',
         message: `Skipping ${adType} ad request - ad already playing`
       });
+      return;
+    }
+
+    // Use optimizer if enabled
+    if (optimizerEnabled && activeTab === 'config') {
+      await handleOptimizedAdRequest(adType);
       return;
     }
 

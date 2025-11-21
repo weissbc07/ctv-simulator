@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { AdRequest, LogEntry, CTVConfig } from '../types';
 import { PREBID_DEMAND_SOURCES } from '../utils/prebidServer';
 import { VastCreative } from '../utils/vastParser';
+import { PodStrategy, AdPodResult, DemandSource } from '../utils/dynamicAdPodOptimizer';
 
 interface AppState {
   // CTV Configuration
@@ -40,6 +41,21 @@ interface AppState {
   setIsPlayingAd: (playing: boolean) => void;
   playAdCreative: (ad: VastCreative) => void;
   stopAdPlayback: () => void;
+
+  // Ad Pod Optimizer State
+  optimizerEnabled: boolean;
+  setOptimizerEnabled: (enabled: boolean) => void;
+  currentPodStrategy: PodStrategy | null;
+  setCurrentPodStrategy: (strategy: PodStrategy | null) => void;
+  lastPodResult: AdPodResult | null;
+  setLastPodResult: (result: AdPodResult | null) => void;
+  podHistory: AdPodResult[];
+  addPodResult: (result: AdPodResult) => void;
+  clearPodHistory: () => void;
+  revenueTargets: Record<string, number>;
+  setRevenueTargets: (targets: Record<string, number>) => void;
+  customDemandSources: DemandSource[];
+  setCustomDemandSources: (sources: DemandSource[]) => void;
 }
 
 const defaultCTVConfig: CTVConfig = {
@@ -123,4 +139,30 @@ export const useStore = create<AppState>((set) => ({
   setIsPlayingAd: (playing) => set({ isPlayingAd: playing }),
   playAdCreative: (ad) => set({ currentAd: ad }),
   stopAdPlayback: () => set({ currentAd: null }),
+
+  // Ad Pod Optimizer State
+  optimizerEnabled: true,
+  setOptimizerEnabled: (enabled) => set({ optimizerEnabled: enabled }),
+  currentPodStrategy: null,
+  setCurrentPodStrategy: (strategy) => set({ currentPodStrategy: strategy }),
+  lastPodResult: null,
+  setLastPodResult: (result) => set({ lastPodResult: result }),
+  podHistory: [],
+  addPodResult: (result) =>
+    set((state) => ({
+      podHistory: [result, ...state.podHistory].slice(0, 100), // Keep last 100 results
+      lastPodResult: result,
+    })),
+  clearPodHistory: () => set({ podHistory: [], lastPodResult: null }),
+  revenueTargets: {
+    preroll: 8.50,
+    midroll: 12.00,
+    postroll: 6.00,
+  },
+  setRevenueTargets: (targets) =>
+    set((state) => ({
+      revenueTargets: { ...state.revenueTargets, ...targets },
+    })),
+  customDemandSources: [],
+  setCustomDemandSources: (sources) => set({ customDemandSources: sources }),
 })); 

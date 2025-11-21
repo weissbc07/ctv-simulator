@@ -3,6 +3,7 @@ import VideoPlayer from './components/VideoPlayer';
 import ConfigPanel from './components/ConfigPanel';
 import AdXConfigPanel from './components/AdXConfigPanel';
 import DAIConfigPanel from './components/DAIConfigPanel';
+import AdPodOptimizerConfigPanel from './components/AdPodOptimizerConfigPanel';
 import DAIVideoPlayer from './components/DAIVideoPlayer';
 import OutstreamConfigPanel from './components/OutstreamConfigPanel';
 import OutstreamVideoPlayer from './components/OutstreamVideoPlayer';
@@ -181,6 +182,15 @@ function App() {
               )}
             </div>
             
+            {/* Optimizer Status */}
+            {optimizerEnabled && activeTab === 'config' && (
+              <div className="flex items-center gap-2 text-sm">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <span className="text-yellow-400">AI Optimizer Active</span>
+                <span className="text-xs bg-yellow-600 px-2 py-1 rounded">AI</span>
+              </div>
+            )}
+
             {/* AdX Status */}
             {adxConfig && activeTab !== 'dai' && (
               <div className="flex items-center gap-2 text-sm">
@@ -233,6 +243,17 @@ function App() {
               Config
             </button>
             <button
+              onClick={() => setActiveTab('optimizer')}
+              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                activeTab === 'optimizer'
+                  ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              AI Pod
+            </button>
+            <button
               onClick={() => setActiveTab('adx')}
               className={`flex-1 px-2 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'adx'
@@ -270,6 +291,7 @@ function App() {
           {/* Tab Content */}
           <div className="flex-1 p-4 overflow-y-auto">
             {activeTab === 'config' && <ConfigPanel />}
+            {activeTab === 'optimizer' && <AdPodOptimizerConfigPanel />}
             {activeTab === 'adx' && (
               <AdXConfigPanel
                 onConfigChange={handleAdXConfigChange}
