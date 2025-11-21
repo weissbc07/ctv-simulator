@@ -143,7 +143,7 @@ export class DynamicAdPodOptimizer {
   /**
    * Estimate user value
    */
-  private async estimateUserValue(user: UserContext): number {
+  private async estimateUserValue(user: UserContext): Promise<number> {
     // Calculate user value based on behavioral signals
     let value = 1.0;
 
