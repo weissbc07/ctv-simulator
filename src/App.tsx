@@ -5,17 +5,45 @@ import AdXConfigPanel from './components/AdXConfigPanel';
 import DAIConfigPanel from './components/DAIConfigPanel';
 import AdPodOptimizerConfigPanel from './components/AdPodOptimizerConfigPanel';
 import DAIVideoPlayer from './components/DAIVideoPlayer';
+import OutstreamConfigPanel from './components/OutstreamConfigPanel';
+import OutstreamVideoPlayer from './components/OutstreamVideoPlayer';
+import OutstreamAnalyticsDashboard from './components/OutstreamAnalyticsDashboard';
 import LogPanel from './components/LogPanel';
 import { useStore } from './store/useStore';
-import { Tv, Activity, Shield, Settings, Video, Zap } from 'lucide-react';
-import { AdXConfig, DAIConfig, DAIStreamRequest } from './types';
+import { Tv, Activity, Shield, Settings, Video, Play } from 'lucide-react';
+import { AdXConfig, DAIConfig, DAIStreamRequest, OutstreamPlayerConfig, OutstreamAnalytics, OutstreamEvent } from './types';
 
 function App() {
-  const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd, optimizerEnabled } = useStore();
-  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai' | 'optimizer'>('config');
+  const { isPlaying, currentTime, duration, addLog, currentAd, isPlayingAd } = useStore();
+  const [activeTab, setActiveTab] = useState<'config' | 'adx' | 'dai' | 'outstream'>('config');
   const [adxConfig, setAdxConfig] = useState<AdXConfig | null>(null);
   const [daiConfig, setDaiConfig] = useState<DAIConfig | null>(null);
   const [daiStreamUrl, setDaiStreamUrl] = useState<string | null>(null);
+  const [outstreamConfig, setOutstreamConfig] = useState<OutstreamPlayerConfig>({
+    id: 'outstream-player-1',
+    autoplay: true,
+    muted: true,
+    sticky: true,
+    stickyPosition: 'bottom-right',
+    stickyOffset: { x: 20, y: 20 },
+    playOnViewport: true,
+    viewportThreshold: 0.5,
+    pauseOnViewportExit: true,
+    width: '640px',
+    height: '360px',
+    aspectRatio: '16/9',
+    enableOptimizations: true,
+    features: {
+      dynamicAdPods: true,
+      intelligentTimeouts: true,
+      vastUnwrapping: true,
+      contextualAI: true,
+      engagementOptimizer: true
+    },
+    trackingEnabled: true
+  });
+  const [outstreamAnalytics, setOutstreamAnalytics] = useState<OutstreamAnalytics | null>(null);
+  const [showOutstreamPlayer, setShowOutstreamPlayer] = useState(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -67,7 +95,7 @@ function App() {
     // For demo purposes, generate a mock stream URL
     const mockStreamUrl = `http://localhost:8081/api/dai/stitch?streamUrl=${encodeURIComponent('https://demo-ctv-content.com/sample.m3u8')}&format=${request.format}`;
     setDaiStreamUrl(mockStreamUrl);
-    
+
     addLog({
       level: 'success',
       message: '🚀 DAI stream request initiated',
@@ -78,6 +106,45 @@ function App() {
         streamUrl: mockStreamUrl
       }
     });
+  }, [addLog]);
+
+  const handleOutstreamConfigChange = useCallback((config: OutstreamPlayerConfig) => {
+    setOutstreamConfig(config);
+    addLog({
+      level: 'info',
+      message: '📐 Outstream player configuration updated',
+      details: {
+        autoplay: config.autoplay,
+        sticky: config.sticky,
+        featuresEnabled: Object.entries(config.features).filter(([_, v]) => v).map(([k]) => k).join(', ')
+      }
+    });
+  }, [addLog]);
+
+  const handleOutstreamTest = useCallback(() => {
+    setShowOutstreamPlayer(true);
+    addLog({
+      level: 'success',
+      message: '🎬 Outstream player test started',
+      details: {
+        playerId: outstreamConfig.id,
+        allFeaturesEnabled: Object.values(outstreamConfig.features).every(v => v)
+      }
+    });
+  }, [addLog, outstreamConfig]);
+
+  const handleOutstreamAnalyticsUpdate = useCallback((analytics: OutstreamAnalytics) => {
+    setOutstreamAnalytics(analytics);
+  }, []);
+
+  const handleOutstreamEvent = useCallback((event: OutstreamEvent) => {
+    if (event.type === 'ad_request') {
+      addLog({
+        level: 'info',
+        message: '🎯 Outstream ad request initiated',
+        details: event.data
+      });
+    }
   }, [addLog]);
 
   return (
@@ -166,7 +233,7 @@ function App() {
           <div className="flex border-b border-gray-700">
             <button
               onClick={() => setActiveTab('config')}
-              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+              className={`flex-1 px-2 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'config'
                   ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700'
@@ -188,7 +255,7 @@ function App() {
             </button>
             <button
               onClick={() => setActiveTab('adx')}
-              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+              className={`flex-1 px-2 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'adx'
                   ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700'
@@ -199,7 +266,7 @@ function App() {
             </button>
             <button
               onClick={() => setActiveTab('dai')}
-              className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+              className={`flex-1 px-2 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
                 activeTab === 'dai'
                   ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700'
@@ -207,6 +274,17 @@ function App() {
             >
               <Video className="w-4 h-4" />
               DAI
+            </button>
+            <button
+              onClick={() => setActiveTab('outstream')}
+              className={`flex-1 px-2 py-3 text-sm font-medium flex items-center justify-center gap-1 transition-colors ${
+                activeTab === 'outstream'
+                  ? 'bg-ctv-blue text-white border-b-2 border-ctv-blue'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <Play className="w-4 h-4" />
+              Outstream
             </button>
           </div>
           
@@ -226,6 +304,12 @@ function App() {
                 onStreamRequest={handleDAIStreamRequest}
               />
             )}
+            {activeTab === 'outstream' && (
+              <OutstreamConfigPanel
+                onConfigChange={handleOutstreamConfigChange}
+                onTestPlayer={handleOutstreamTest}
+              />
+            )}
           </div>
         </div>
         
@@ -233,7 +317,24 @@ function App() {
         <div className="flex-1 p-4">
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              {activeTab === 'dai' ? (
+              {activeTab === 'outstream' ? (
+                <>
+                  <Play className="w-5 h-5 text-purple-400" />
+                  <h2 className="text-lg font-semibold">Outstream Video Player</h2>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <span>•</span>
+                    <span>AI-Powered Monetization</span>
+                    {outstreamConfig && Object.values(outstreamConfig.features).filter(v => v).length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="text-purple-400">
+                          {Object.values(outstreamConfig.features).filter(v => v).length} Features Active
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : activeTab === 'dai' ? (
                 <>
                   <Video className="w-5 h-5 text-purple-400" />
                   <h2 className="text-lg font-semibold">DAI Video Player</h2>
@@ -277,7 +378,26 @@ function App() {
             </div>
             
             <div className="flex-1 bg-black rounded-lg overflow-hidden">
-              {activeTab === 'dai' ? (
+              {activeTab === 'outstream' ? (
+                showOutstreamPlayer ? (
+                  <OutstreamVideoPlayer
+                    config={outstreamConfig}
+                    onAnalyticsUpdate={handleOutstreamAnalyticsUpdate}
+                    onEvent={handleOutstreamEvent}
+                    className="h-full"
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center space-y-4">
+                      <Play className="w-16 h-16 mx-auto opacity-50" />
+                      <div>
+                        <p className="text-lg font-semibold mb-2">Outstream Video Player</p>
+                        <p className="text-sm">Configure settings and click "Test Outstream Player" to start</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              ) : activeTab === 'dai' ? (
                 <DAIVideoPlayer
                   streamUrl={daiStreamUrl || undefined}
                   config={daiConfig || undefined}
@@ -292,9 +412,13 @@ function App() {
           </div>
         </div>
         
-        {/* Right Panel - Logs */}
+        {/* Right Panel - Logs/Analytics */}
         <div className="w-96 border-l border-gray-700 p-4">
-          <LogPanel />
+          {activeTab === 'outstream' && outstreamAnalytics ? (
+            <OutstreamAnalyticsDashboard analytics={outstreamAnalytics} />
+          ) : (
+            <LogPanel />
+          )}
         </div>
       </div>
     </div>

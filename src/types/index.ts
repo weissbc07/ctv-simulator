@@ -820,4 +820,405 @@ export interface DAIEvent {
   adBreak?: AdBreak;
   ad?: DAIAd;
   error?: string;
+}
+
+// =============================================================================
+// OUTSTREAM VIDEO PLAYER TYPES
+// =============================================================================
+
+export interface OutstreamPlayerConfig {
+  // Basic configuration
+  id: string;
+  autoplay: boolean;
+  muted: boolean;
+
+  // Positioning
+  sticky: boolean;
+  stickyPosition?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  stickyOffset?: { x: number; y: number };
+
+  // Visibility controls
+  playOnViewport: boolean;
+  viewportThreshold: number; // 0-1, percentage of player visible to trigger autoplay
+  pauseOnViewportExit: boolean;
+
+  // Size & responsive
+  width: number | string;
+  height: number | string;
+  aspectRatio?: string;
+
+  // Ad configuration
+  enableOptimizations: boolean;
+  features: OutstreamFeatures;
+
+  // Tracking
+  trackingEnabled: boolean;
+  analyticsEndpoint?: string;
+}
+
+export interface OutstreamFeatures {
+  dynamicAdPods: boolean;
+  intelligentTimeouts: boolean;
+  vastUnwrapping: boolean;
+  contextualAI: boolean;
+  engagementOptimizer: boolean;
+}
+
+// =============================================================================
+// FEATURE #1: DYNAMIC AD POD OPTIMIZER
+// =============================================================================
+
+export interface AdPodOpportunity {
+  position: 'pre-roll' | 'mid-roll' | 'post-roll' | 'outstream';
+  videoLength?: number;
+  maxAdDuration: number;
+  user: UserContext;
+  category: string;
+  device: string;
+}
+
+export interface UserContext {
+  id: string;
+  sessionCount: number;
+  avgSessionDuration: number;
+  totalVideosWatched: number;
+  avgCompletionRate: number;
+  adCompletionRate: number;
+  estimatedLTV: number;
+}
+
+export interface DemandSource {
+  name: string;
+  avgCPM: number;
+  fillRate: number;
+  responseTime: number;
+  acceptedDurations: number[];
+  competitiveCategories: string[];
+  timeout: number;
+}
+
+export interface AdPodStrategy {
+  slotCount: number;
+  durations: number[];
+  sequence: AdSlotStrategy[];
+  expectedRevenue: number;
+  expectedCompletionRate: number;
+  reasoning: string;
+}
+
+export interface AdSlotStrategy {
+  slot: number;
+  sources: string[];
+  floor: number;
+  timeout: number;
+  duration: number;
+  expectedCPM: number;
+  fillProbability: number;
+  parallelGroup?: string;
+}
+
+export interface AdPodResult {
+  slotsAttempted: number;
+  slotsFilled: number;
+  totalRevenue: number;
+  totalDuration: number;
+  completionRate: number;
+  actualCPM: number;
+}
+
+// =============================================================================
+// FEATURE #2: INTELLIGENT TIMEOUT & BID LATENCY OPTIMIZER
+// =============================================================================
+
+export interface SSPPerformance {
+  ssp: string;
+  avgResponseTime: number;
+  p95ResponseTime: number;
+  timeoutRate: number;
+  avgCPM: number;
+  fillRate: number;
+  lastUpdated: Date;
+  recentSamples: number;
+}
+
+export interface TimeoutAllocation {
+  ssp: string;
+  timeout: number;
+  priority: number;
+  parallelGroup?: string;
+  expectedContribution: number;
+}
+
+export interface TimeoutStrategy {
+  strategy: 'parallel' | 'sequential' | 'hybrid';
+  ssps: TimeoutAllocation[];
+  expectedRevenue: number;
+  expectedLatency: number;
+  expectedFillRate: number;
+  reasoning: string;
+}
+
+export interface BidResult {
+  ssp: string;
+  cpm: number;
+  currency: string;
+  vastUrl?: string;
+  vastXml?: string;
+  responseTime: number;
+  dealId?: string;
+  meta?: Record<string, any>;
+}
+
+// =============================================================================
+// FEATURE #3: SERVER-SIDE VAST UNWRAPPING + CREATIVE QUALITY VALIDATOR
+// =============================================================================
+
+export interface VASTUnwrapResult {
+  originalUrl: string;
+  chain: VASTWrapperChain[];
+  finalVAST: VASTInline | null;
+  trackingPixels: string[];
+  verificationScripts: string[];
+  duration: number;
+  pricing: VASTPricing | null;
+  errors: VASTError[];
+  unwrapTime: number;
+}
+
+export interface VASTWrapperChain {
+  depth: number;
+  url: string;
+  responseTime: number;
+}
+
+export interface VASTInline {
+  adTitle: string;
+  duration: number;
+  mediaFiles: VASTMediaFile[];
+  clickThrough?: string;
+  trackingEvents: Record<string, string[]>;
+  verifications?: any[];
+}
+
+export interface VASTMediaFile {
+  url: string;
+  type: string;
+  bitrate: number;
+  width: number;
+  height: number;
+  codec?: string;
+}
+
+export interface VASTPricing {
+  price: number;
+  currency: string;
+  model: 'cpm' | 'cpc' | 'cpe';
+}
+
+export interface VASTError {
+  depth: number;
+  url: string;
+  error: string;
+}
+
+export interface CreativeQualityScore {
+  overallScore: number; // 0-100
+  shouldServe: boolean;
+  issues: string[];
+  warnings: string[];
+  recommendations: string[];
+  technical: TechnicalValidation;
+  performance: PerformancePrediction;
+  brandSafety: BrandSafetyCheck;
+  reasoning: string;
+}
+
+export interface TechnicalValidation {
+  score: number;
+  issues: string[];
+  critical: boolean;
+  mediaFilesValid: boolean;
+  trackingValid: boolean;
+}
+
+export interface PerformancePrediction {
+  predictedCompletionRate: number;
+  predictedCTR: number;
+  predictedLoadTime: number;
+  confidence: number;
+}
+
+export interface BrandSafetyCheck {
+  score: number;
+  safe: boolean;
+  categories: string[];
+  warnings: string[];
+}
+
+// =============================================================================
+// FEATURE #4: CONTEXTUAL AI + FIRST-PARTY DATA ACTIVATION
+// =============================================================================
+
+export interface UserProfile {
+  userId: string;
+
+  // Behavioral signals
+  avgSessionDuration: number;
+  videosWatchedLast30Days: number;
+  avgCompletionRate: number;
+  preferredCategories: string[];
+  peakActivityHours: number[];
+  devicePreference: string;
+
+  // AI-inferred attributes
+  interestCategories: string[];
+  intentSignals: string[];
+  lifestageEstimate: string;
+  purchaseIntent: Record<string, number>;
+  brandAffinities: string[];
+
+  // Value signals
+  lifetimeValue: number;
+  adEngagementScore: number; // 0-100
+  premiumScore: number; // 0-100
+}
+
+export interface ContentAnalysis {
+  videoId: string;
+  title: string;
+  topics: string[];
+  sentiment: 'positive' | 'neutral' | 'negative';
+  contentIntensity: 'calm' | 'moderate' | 'high_energy';
+  audienceSophistication: 'general' | 'intermediate' | 'expert';
+  brandSafetyScore: number;
+  suitableAdvertisers: string[];
+  unsuitableAdvertisers: string[];
+  premiumContentScore: number;
+  optimalAdTypes: ('brand_awareness' | 'direct_response')[];
+}
+
+export interface TargetingPackage {
+  standardTargeting: Record<string, any>;
+  premiumTargeting: Record<string, any>;
+  recommendedFloor: number;
+  floorModifiers: Record<string, number>;
+  preferredAdvertisers: string[];
+  blockedCategories: string[];
+  dealEligibility: string[];
+  expectedCPMRange: string;
+}
+
+export interface MonetizationStrategy {
+  recommendedFloor: number;
+  floorModifiers: Record<string, number>;
+  preferredAdvertisers: string[];
+  blockedCategories: string[];
+  dealEligibility: string[];
+  expectedCPM: string;
+  reasoning: string;
+}
+
+// =============================================================================
+// FEATURE #5: PREDICTIVE USER ENGAGEMENT & RETENTION OPTIMIZER
+// =============================================================================
+
+export interface AbandonmentRisk {
+  abandonmentRisk: number; // 0-1
+  timeUntilAbandon: number; // seconds
+  confidence: number;
+  primaryFactors: string[];
+  recommendation: 'serve_normal' | 'reduce_ad_load' | 'skip_ads' | 'gentle_treatment';
+}
+
+export interface EngagementContext {
+  sessionDuration: number;
+  videosThisSession: number;
+  adsThisSession: number;
+  lastAdCompletedRate: number;
+  scrollSpeed: number;
+  mouseMovement: number;
+  timeOnPage: number;
+  interactionCount: number;
+  device: string;
+  connection: string;
+}
+
+export interface AdLoadOptimization {
+  adCount: number;
+  positions: string[];
+  maxTotalDuration: number;
+  skipAds: boolean;
+  reasoning: string;
+  expectedImmediateRevenue: number;
+  expectedFutureValue: number;
+  recommendedAction: string;
+}
+
+export interface AdDecision {
+  serve: boolean;
+  reason: string;
+  maxDuration?: number;
+  floorAdjustment?: number;
+  reasoning?: string;
+}
+
+export interface UserFeedbackEvent {
+  type: 'ad_skipped' | 'ad_completed' | 'video_abandoned_during_ad' | 'video_completed' | 'clicked_ad' | 'returned_next_day' | 'churned';
+  context: any;
+  timestamp: Date;
+}
+
+// =============================================================================
+// OUTSTREAM ANALYTICS & TRACKING
+// =============================================================================
+
+export interface OutstreamAnalytics {
+  sessionId: string;
+  playerInstanceId: string;
+
+  // Visibility tracking
+  timeInViewport: number;
+  timePlaying: number;
+  viewabilityScore: number; // 0-100
+
+  // Ad performance
+  adsRequested: number;
+  adsFilled: number;
+  adsStarted: number;
+  adsCompleted: number;
+  fillRate: number;
+  completionRate: number;
+
+  // Revenue
+  totalRevenue: number;
+  avgCPM: number;
+  eCPM: number;
+
+  // Optimization metrics
+  avgRequestLatency: number;
+  timeoutRate: number;
+  vastErrorRate: number;
+
+  // User engagement
+  userInteractions: number;
+  clickThroughs: number;
+  abandonmentRate: number;
+
+  // Feature performance
+  dynamicAdPodsUsed: boolean;
+  intelligentTimeoutsUsed: boolean;
+  vastUnwrappingUsed: boolean;
+  contextualAIUsed: boolean;
+  engagementOptimizerUsed: boolean;
+
+  // Timestamps
+  sessionStarted: Date;
+  lastActivity: Date;
+}
+
+export interface OutstreamEvent {
+  type: 'player_initialized' | 'viewport_enter' | 'viewport_exit' | 'ad_request' | 'ad_response' | 'ad_start' | 'ad_complete' | 'ad_error' | 'user_interaction' | 'optimization_applied';
+  timestamp: Date;
+  data?: any;
+  analytics?: Partial<OutstreamAnalytics>;
 } 
